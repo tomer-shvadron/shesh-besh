@@ -77,6 +77,15 @@ body,
   }
 }
 
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-accent); }
+  50% { box-shadow: 0 0 8px 3px var(--color-accent); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
 /* PWA fullscreen adjustments */
 @media (display-mode: fullscreen), (display-mode: standalone) {
   body {
