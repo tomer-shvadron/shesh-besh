@@ -27,7 +27,11 @@ function Btn({
       <button
         onClick={onClick}
         disabled={disabled}
+        aria-label={label}
+        aria-disabled={disabled}
         className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1
+          focus-visible:ring-[var(--color-accent)]
           ${
             disabled
               ? 'opacity-40 cursor-not-allowed text-[var(--color-text-secondary)]'
@@ -35,7 +39,7 @@ function Btn({
           }
           ${pulse ? 'animate-pulse' : ''}`}
       >
-        <span className="text-base">{icon}</span>
+        <span className="text-base" aria-hidden="true">{icon}</span>
         <span>{label}</span>
       </button>
     );
@@ -46,7 +50,10 @@ function Btn({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      aria-disabled={disabled}
       className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-2 py-1 text-xs transition-colors
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1
+        focus-visible:ring-[var(--color-accent)]
         ${
           disabled
             ? 'opacity-40 cursor-not-allowed text-[var(--color-text-secondary)]'

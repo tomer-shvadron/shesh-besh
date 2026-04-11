@@ -5,6 +5,7 @@ import type { TextureMode, Theme } from '@/state/settings.store';
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onHowToPlay: () => void;
 }
 
 function Toggle({
@@ -69,7 +70,7 @@ function SegmentedControl<T extends string>({
   );
 }
 
-export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps): React.JSX.Element | null {
+export function SettingsPanel({ isOpen, onClose, onHowToPlay }: SettingsPanelProps): React.JSX.Element | null {
   const { theme, textureMode, soundEnabled, defaultDifficulty, setTheme, setTextureMode, setSoundEnabled, setDefaultDifficulty } =
     useSettingsPanelLogic();
 
@@ -84,6 +85,9 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps): React.JS
 
       {/* Panel — slides from right on mobile, centered modal on desktop */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
         className="fixed right-0 top-0 bottom-0 z-50 w-80 max-w-full
           bg-[var(--color-surface-raised)] border-l border-[var(--color-surface-border)]
           flex flex-col shadow-2xl"
@@ -150,6 +154,25 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps): React.JS
               value={defaultDifficulty}
               onChange={setDefaultDifficulty}
             />
+          </section>
+
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-4">
+              Help
+            </h3>
+            <button
+              onClick={() => {
+                onClose();
+                onHowToPlay();
+              }}
+              className="flex w-full items-center gap-2 rounded-lg border border-[var(--color-surface-border)]
+                px-4 py-3 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-border)]
+                transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+              aria-label="Open How to Play tutorial"
+            >
+              <span aria-hidden="true">📖</span>
+              <span>How to Play</span>
+            </button>
           </section>
         </div>
       </div>

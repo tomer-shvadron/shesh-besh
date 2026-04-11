@@ -7,6 +7,7 @@ import { NewGameDialog } from '@/components/NewGameDialog/NewGameDialog';
 import { PauseOverlay } from '@/components/PauseOverlay/PauseOverlay';
 import { SettingsPanel } from '@/components/SettingsPanel/SettingsPanel';
 import { TopBar } from '@/components/TopBar/TopBar';
+import { Tutorial } from '@/components/Tutorial/Tutorial';
 import { BoardCanvas } from '@/renderer/BoardCanvas';
 
 export function GameScreen(): React.JSX.Element {
@@ -16,6 +17,7 @@ export function GameScreen(): React.JSX.Element {
     showGameOverDialog,
     showSettings,
     showHighScores,
+    showTutorial,
     openNewGame,
     closeNewGame,
     openSettings,
@@ -23,6 +25,8 @@ export function GameScreen(): React.JSX.Element {
     openHighScores,
     closeHighScores,
     closeGameOver,
+    openTutorial,
+    closeTutorial,
   } = useGameScreenLogic();
 
   return (
@@ -59,9 +63,11 @@ export function GameScreen(): React.JSX.Element {
         }}
       />
 
-      <SettingsPanel isOpen={showSettings} onClose={closeSettings} />
+      <SettingsPanel isOpen={showSettings} onClose={closeSettings} onHowToPlay={openTutorial} />
 
       <HighScoresPanel isOpen={showHighScores} onClose={closeHighScores} />
+
+      <Tutorial isOpen={showTutorial} onClose={closeTutorial} />
     </>
   );
 }

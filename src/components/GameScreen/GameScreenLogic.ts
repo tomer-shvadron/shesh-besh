@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useSettingsPersistence } from '@/hooks/useSettingsPersistence';
 import { useTimer } from '@/hooks/useTimer';
 import { useWakeLock } from '@/hooks/useWakeLock';
 import { clearGame, loadGame } from '@/services/gameSave.service';
 import { useGameStore } from '@/state/game.store';
+import { useSettingsStore } from '@/state/settings.store';
 import { DESKTOP_BREAKPOINT } from '@/utils/responsive';
 
 export interface GameScreenLogicReturn {
@@ -13,6 +15,7 @@ export interface GameScreenLogicReturn {
   showGameOverDialog: boolean;
   showSettings: boolean;
   showHighScores: boolean;
+  showTutorial: boolean;
   openNewGame: () => void;
   closeNewGame: () => void;
   openSettings: () => void;
@@ -20,6 +23,8 @@ export interface GameScreenLogicReturn {
   openHighScores: () => void;
   closeHighScores: () => void;
   closeGameOver: () => void;
+  openTutorial: () => void;
+  closeTutorial: () => void;
 }
 
 export function useGameScreenLogic(): GameScreenLogicReturn {
@@ -27,14 +32,17 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
   const [showNewGameDialog, setShowNewGameDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHighScores, setShowHighScores] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const phase = useGameStore((s) => s.phase);
   const loadState = useGameStore((s) => s.loadState);
+  const tutorialSeen = useSettingsStore((s) => s.tutorialSeen);
 
   // Activate side-effect hooks
   useAutoSave();
   useTimer();
   useWakeLock();
+  useSettingsPersistence();
 
   // On mount, try to load a saved game. If none exists, open the new game dialog.
   useEffect(() => {
@@ -62,6 +70,13 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Show tutorial automatically on first launch (after settings are loaded from DB)
+  useEffect(() => {
+    if (!tutorialSeen) {
+      setShowTutorial(true);
+    }
+  }, [tutorialSeen]);
 
   const handleResize = useCallback(() => {
     setIsDesktopLayout(window.innerWidth >= DESKTOP_BREAKPOINT);
@@ -103,6 +118,14 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
     void clearGame();
   }, []);
 
+  const openTutorial = useCallback((): void => {
+    setShowTutorial(true);
+  }, []);
+
+  const closeTutorial = useCallback((): void => {
+    setShowTutorial(false);
+  }, []);
+
   const showGameOverDialog = phase === 'game-over';
 
   return {
@@ -111,6 +134,7 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
     showGameOverDialog,
     showSettings,
     showHighScores,
+    showTutorial,
     openNewGame,
     closeNewGame,
     openSettings,
@@ -118,5 +142,7 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
     openHighScores,
     closeHighScores,
     closeGameOver,
+    openTutorial,
+    closeTutorial,
   };
 }

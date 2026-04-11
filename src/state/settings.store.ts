@@ -10,10 +10,12 @@ interface SettingsState {
   textureMode: TextureMode;
   soundEnabled: boolean;
   defaultDifficulty: Difficulty;
+  tutorialSeen: boolean;
   setTheme: (theme: Theme) => void;
   setTextureMode: (mode: TextureMode) => void;
   setSoundEnabled: (enabled: boolean) => void;
   setDefaultDifficulty: (difficulty: Difficulty) => void;
+  setTutorialSeen: (seen: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -21,6 +23,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   textureMode: 'realistic',
   soundEnabled: true,
   defaultDifficulty: 'medium',
+  tutorialSeen: false,
   setTheme: (theme) => {
     set({ theme });
   },
@@ -32,5 +35,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
   setDefaultDifficulty: (defaultDifficulty) => {
     set({ defaultDifficulty });
+  },
+  setTutorialSeen: (tutorialSeen) => {
+    set({ tutorialSeen });
   },
 }));

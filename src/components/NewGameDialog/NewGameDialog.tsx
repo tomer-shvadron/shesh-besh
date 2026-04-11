@@ -30,6 +30,9 @@ export function NewGameDialog({ isOpen, onClose }: NewGameDialogProps): React.JS
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-game-dialog-title"
         className="w-full max-w-sm rounded-2xl bg-[var(--color-surface-raised)] border border-[var(--color-surface-border)]
           p-6 shadow-2xl"
         style={{ animation: 'fadeScaleIn 0.2s ease-out' }}
@@ -69,7 +72,7 @@ function ModeStep({
 }): React.JSX.Element {
   return (
     <>
-      <h2 className="text-xl font-bold text-[var(--color-text-primary)] mb-1">New Game</h2>
+      <h2 id="new-game-dialog-title" className="text-xl font-bold text-[var(--color-text-primary)] mb-1">New Game</h2>
       <p className="text-sm text-[var(--color-text-secondary)] mb-5">Choose your opponent</p>
 
       <div className="flex flex-col gap-3">

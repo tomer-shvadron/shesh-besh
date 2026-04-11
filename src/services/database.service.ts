@@ -31,6 +31,7 @@ export interface SettingsRecord {
   textureMode: TextureMode;
   soundEnabled: boolean;
   defaultDifficulty: Difficulty;
+  tutorialSeen?: boolean;
 }
 
 class SheshBeshDatabase extends Dexie {
