@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Board theme colors — dark mode defaults */
+  --color-board-frame: #3e2723;
+  --color-board-surface: #2e7d32;
+  --color-board-bar: #4e342e;
+  --color-triangle-dark: #7b1fa2;
+  --color-triangle-light: #faf3e0;
+  --color-checker-white: #fafafa;
+  --color-checker-black: #3e2723;
+  --color-accent: #f59e0b;
+  --color-accent-hover: #d97706;
+
+  /* UI colors */
+  --color-surface: #0f172a;
+  --color-surface-raised: #1e293b;
+  --color-surface-border: #334155;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+}
+
+/* Light theme overrides */
+.light {
+  --color-board-frame: #c4a882;
+  --color-board-surface: #9cae9c;
+  --color-board-bar: #b8a088;
+  --color-triangle-dark: #0d9488;
+  --color-triangle-light: #e8d5b7;
+  --color-checker-white: #f5f5f5;
+  --color-checker-black: #374151;
+  --color-accent: #d97706;
+  --color-accent-hover: #b45309;
+
+  --color-surface: #f5f0eb;
+  --color-surface-raised: #ffffff;
+  --color-surface-border: #d6d3d1;
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #64748b;
+}
+
+/* Base styles */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* PWA fullscreen adjustments */
+@media (display-mode: fullscreen), (display-mode: standalone) {
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+}

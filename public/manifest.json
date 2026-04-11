@@ -1,0 +1,30 @@
+{
+  "name": "Shesh-Besh",
+  "short_name": "Shesh-Besh",
+  "description": "Play backgammon offline against AI or a friend",
+  "start_url": "/shesh-besh/",
+  "scope": "/shesh-besh/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0f172a",
+  "theme_color": "#f59e0b",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
