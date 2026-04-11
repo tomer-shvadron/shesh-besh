@@ -1,130 +1,186 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-const BOARD_ASPECT_RATIO = 3 / 2;
+import type { DiceValue } from '@/engine/types';
+import { useCanvasResize } from '@/hooks/useCanvasResize';
+import { useGameLoop } from '@/hooks/useGameLoop';
+import type { BoardDimensions } from '@/renderer/dimensions';
+import { drawBoard } from '@/renderer/drawBoard';
+import { drawCheckers } from '@/renderer/drawCheckers';
+import { drawSingleDie } from '@/renderer/drawDice';
+import { drawHighlights } from '@/renderer/drawHighlights';
+import { hitTest } from '@/renderer/hitTest';
+import { darkTheme } from '@/renderer/themes/dark';
+import { lightTheme } from '@/renderer/themes/light';
+import type { BoardTheme } from '@/renderer/themes/types';
+import { useGameStore } from '@/state/game.store';
+import { useSettingsStore } from '@/state/settings.store';
 
 interface BoardCanvasLogicReturn {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Core logic hook for the board canvas.
+ * - Manages canvas sizing via ResizeObserver (DPR-aware)
+ * - Drives a requestAnimationFrame game loop
+ * - Renders board, checkers, highlights, and dice each frame
+ * - Handles pointer events via hitTest → game store dispatch
+ */
 export function useBoardCanvasLogic(): BoardCanvasLogicReturn {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const resizeCanvas = useCallback(() => {
+  // Dimensions ref from ResizeObserver (CSS pixels) — not React state to avoid re-renders
+  const dimsRef = useCanvasResize(canvasRef, containerRef);
+
+  // Game state from Zustand
+  const gameState = useGameStore();
+  const { theme: themeName } = useSettingsStore();
+
+  // Stable refs to the latest values for use inside RAF callback
+  // Updated via effects (not during render) to satisfy the react-hooks/refs rule.
+  const gameStateRef = useRef(gameState);
+  const themeRef = useRef<BoardTheme>(themeName === 'dark' ? darkTheme : lightTheme);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  });
+
+  useEffect(() => {
+    themeRef.current = themeName === 'dark' ? darkTheme : lightTheme;
+  });
+
+  // ── Render frame ─────────────────────────────────────────────────────────────
+  const renderFrame = useCallback(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) {
+    const currentDims = dimsRef.current;
+    if (!canvas || !currentDims) {
       return;
     }
 
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    const dpr = window.devicePixelRatio || 1;
-
-    let width = containerWidth;
-    let height = containerWidth / BOARD_ASPECT_RATIO;
-
-    if (height > containerHeight) {
-      height = containerHeight;
-      width = containerHeight * BOARD_ASPECT_RATIO;
-    }
-
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
-
     const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      drawPlaceholderBoard(ctx, width, height);
+    if (!ctx) {
+      return;
     }
-  }, []);
 
+    const state = gameStateRef.current;
+    const currentTheme = themeRef.current;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, currentDims.width, currentDims.height);
+
+    // 1. Draw static board (frame, felt, triangles, bar)
+    drawBoard(ctx, currentDims, currentTheme);
+
+    // 2. Draw valid destination highlights (below checkers)
+    if (state.validDestinations.length > 0) {
+      drawHighlights(ctx, state.validDestinations, currentDims, currentTheme, state.board);
+    }
+
+    // 3. Draw checkers
+    drawCheckers(ctx, state.board, currentDims, currentTheme, state.selectedPoint);
+
+    // 4. Draw dice in the bar area
+    if (state.remainingDice.length > 0) {
+      renderDiceInBar(ctx, state.remainingDice, currentDims, currentTheme);
+    }
+  }, [dimsRef]);
+
+  // Loop is active whenever the canvas has been measured
+  useGameLoop(renderFrame, true);
+
+  // ── Pointer event handler ─────────────────────────────────────────────────────
+  const handlePointerDown = useCallback((event: PointerEvent): void => {
+    const canvas = canvasRef.current;
+    const currentDims = dimsRef.current;
+    if (!canvas || !currentDims) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const cssX = event.clientX - rect.left;
+    const cssY = event.clientY - rect.top;
+
+    const zone = hitTest(cssX, cssY, currentDims);
+    if (!zone) {
+      return;
+    }
+
+    const state = gameStateRef.current;
+
+    if (zone.type === 'bar') {
+      // Only meaningful if current player has checkers on bar
+      if (state.board.bar[state.currentPlayer] > 0) {
+        state.handleSelectPoint('bar');
+      }
+      return;
+    }
+
+    if (zone.type === 'bearOff') {
+      if (state.selectedPoint !== null) {
+        state.handleSelectDestination('off');
+      }
+      return;
+    }
+
+    if (zone.type === 'point') {
+      const { index } = zone;
+      const pt = state.board.points[index];
+      const hasCurrentPlayerChecker = pt?.player === state.currentPlayer && (pt?.count ?? 0) > 0;
+
+      if (state.selectedPoint !== null) {
+        // We have a selected checker — check if this is a valid destination
+        if (state.validDestinations.includes(index)) {
+          state.handleSelectDestination(index);
+        } else if (hasCurrentPlayerChecker) {
+          // Re-select a different checker of the same player
+          state.handleSelectPoint(index);
+        } else {
+          // Click elsewhere — deselect by toggling same point
+          state.handleSelectPoint(state.selectedPoint);
+        }
+      } else if (hasCurrentPlayerChecker && state.phase === 'moving') {
+        state.handleSelectPoint(index);
+      }
+    }
+  }, [dimsRef]);
+
+  // Attach pointer listener once canvas is available
   useEffect(() => {
-    resizeCanvas();
-
-    const observer = new ResizeObserver(() => {
-      resizeCanvas();
-    });
-
-    const container = containerRef.current;
-    if (container) {
-      observer.observe(container);
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
     }
-
+    canvas.addEventListener('pointerdown', handlePointerDown);
     return () => {
-      observer.disconnect();
+      canvas.removeEventListener('pointerdown', handlePointerDown);
     };
-  }, [resizeCanvas]);
+  }, [handlePointerDown]);
 
   return { canvasRef, containerRef };
 }
 
-function drawPlaceholderBoard(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-  const boardColor = getComputedStyle(document.documentElement).getPropertyValue('--color-board-surface').trim();
-  const frameColor = getComputedStyle(document.documentElement).getPropertyValue('--color-board-frame').trim();
-  const triangleDark = getComputedStyle(document.documentElement).getPropertyValue('--color-triangle-dark').trim();
-  const triangleLight = getComputedStyle(document.documentElement).getPropertyValue('--color-triangle-light').trim();
+// ─── Dice rendering helper ────────────────────────────────────────────────────
 
-  const padding = width * 0.03;
-  const barWidth = width * 0.04;
-  const boardLeft = padding;
-  const boardTop = padding;
-  const boardWidth = width - padding * 2;
-  const boardHeight = height - padding * 2;
+function renderDiceInBar(
+  ctx: CanvasRenderingContext2D,
+  remainingDice: DiceValue[],
+  dims: BoardDimensions,
+  theme: BoardTheme,
+): void {
+  const dieSize = Math.min(dims.barWidth * 0.72, 32);
+  const spacing = dieSize * 1.3;
+  const totalH = dieSize * remainingDice.length + spacing * (remainingDice.length - 1);
+  const barCx = dims.barLeft + dims.barWidth / 2;
+  const startY = dims.boardTop + dims.boardHeight / 2 - totalH / 2 + dieSize / 2;
 
-  // Frame
-  ctx.fillStyle = frameColor || '#3e2723';
-  ctx.fillRect(0, 0, width, height);
-
-  // Playing surface
-  ctx.fillStyle = boardColor || '#2e7d32';
-  ctx.fillRect(boardLeft, boardTop, boardWidth, boardHeight);
-
-  // Bar
-  const barX = width / 2 - barWidth / 2;
-  ctx.fillStyle = frameColor || '#3e2723';
-  ctx.fillRect(barX, boardTop, barWidth, boardHeight);
-
-  // Draw triangles
-  const halfBoardWidth = (boardWidth - barWidth) / 2;
-  const triangleWidth = halfBoardWidth / 6;
-  const triangleHeight = boardHeight * 0.42;
-
-  for (let i = 0; i < 12; i++) {
-    const isTop = i < 6;
-    const col = isTop ? 5 - i : i - 6;
-    const isLeftHalf = i < 6;
-    const baseX = isLeftHalf
-      ? boardLeft + col * triangleWidth
-      : boardLeft + halfBoardWidth + barWidth + (col) * triangleWidth;
-
-    const color = i % 2 === 0 ? triangleDark || '#7b1fa2' : triangleLight || '#faf3e0';
-
-    // Top triangles (pointing down)
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(baseX, boardTop);
-    ctx.lineTo(baseX + triangleWidth, boardTop);
-    ctx.lineTo(baseX + triangleWidth / 2, boardTop + triangleHeight);
-    ctx.closePath();
-    ctx.fill();
-
-    // Bottom triangles (pointing up)
-    ctx.beginPath();
-    ctx.moveTo(baseX, boardTop + boardHeight);
-    ctx.lineTo(baseX + triangleWidth, boardTop + boardHeight);
-    ctx.lineTo(baseX + triangleWidth / 2, boardTop + boardHeight - triangleHeight);
-    ctx.closePath();
-    ctx.fill();
+  for (let i = 0; i < remainingDice.length; i++) {
+    const die = remainingDice[i];
+    if (die === undefined) {
+      continue;
+    }
+    const cy = startY + i * spacing;
+    drawSingleDie(ctx, barCx, cy, dieSize, die, theme, false);
   }
-
-  // Center text
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-  ctx.font = `${Math.round(width * 0.03)}px Inter, system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Shesh-Besh', width / 2, height / 2);
 }

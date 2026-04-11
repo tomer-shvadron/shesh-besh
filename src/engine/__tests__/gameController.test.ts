@@ -14,7 +14,8 @@ import {
   undoLastMove,
   undoTurn,
 } from '@/engine/gameController';
-import type { BoardState, GameState, Move } from '@/engine/types';
+import type { GameState } from '@/engine/gameController';
+import type { BoardState, Move } from '@/engine/types';
 
 function makeRollingState(overrides: Partial<GameState> = {}): GameState {
   return {
