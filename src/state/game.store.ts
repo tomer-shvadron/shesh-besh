@@ -42,6 +42,12 @@ interface GameStoreState extends GameState {
   handlePause: () => void;
   handleResume: () => void;
   handleDismissNoMoves: () => void;
+
+  // Timer
+  incrementTimer: (ms: number) => void;
+
+  // State restoration (used by load game)
+  loadState: (state: GameState) => void;
 }
 
 export const useGameStore = create<GameStoreState>((set, get) => ({
@@ -167,6 +173,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const state = get();
     const next = dismissNoMovesMessage(state);
     set(next);
+  },
+
+  // ── Timer ─────────────────────────────────────────────────────────────────────
+  incrementTimer: (ms: number) => {
+    const { timerElapsed } = get();
+    set({ timerElapsed: timerElapsed + ms });
+  },
+
+  // ── Load persisted game state ─────────────────────────────────────────────────
+  loadState: (state: GameState) => {
+    set({ ...state, selectedPoint: null, validDestinations: [] });
   },
 }));
 

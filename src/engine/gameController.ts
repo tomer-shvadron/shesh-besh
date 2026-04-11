@@ -18,6 +18,7 @@ export interface GameState {
   difficulty: Difficulty;
   legalMovesForTurn: TurnMoves[];
   noMovesMessage: boolean;
+  timerElapsed: number;        // Total time elapsed in ms (active play only)
 }
 
 interface GameControllerOptions {
@@ -47,6 +48,7 @@ export function createInitialState(opts: GameControllerOptions): GameState {
     difficulty: opts.difficulty,
     legalMovesForTurn: [],
     noMovesMessage: false,
+    timerElapsed: 0,
   };
 }
 
