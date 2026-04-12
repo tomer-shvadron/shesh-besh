@@ -156,26 +156,32 @@ function TurnRow({ entry, isCurrentTurn }: { entry: MoveEntry; isCurrentTurn: bo
         <DiceDisplay dice={entry.dice} />
       </div>
 
-      {/* Row 2: all moves inline, clustered.
-           Indent = turn-number width (min-w-[1.75rem]) + gap-1.5 (0.375rem)
-           so the chips align directly below the player color dot in row 1.
-           Each chip is wrapped with its preceding separator in a single inline
-           flex unit so the separator never appears alone at the start of a
-           wrapped line. */}
-      <div className="flex flex-wrap items-center gap-y-1 pl-[2.125rem]">
+      {/* Row 2: moves grouped in pairs, each pair on its own line.
+           • At most 2 moves per line — no wrapping ambiguity.
+           • Separator dot only rendered when a second chip exists in the same
+             pair, so it is always between two visible items on the same line.
+           Indent aligns with the player colour dot in row 1. */}
+      <div className="flex flex-col gap-y-0.5 pl-[2.125rem]">
         {entry.isEmpty ? (
           <span className="opacity-50 italic text-xs">no moves</span>
         ) : (
-          entry.segments.map((seg, i) => (
-            <span key={i} className="inline-flex items-center">
-              {i > 0 && (
-                <span className="mx-1.5 opacity-75 select-none font-bold" aria-hidden="true">
-                  ·
-                </span>
-              )}
-              <MoveChip seg={seg} />
-            </span>
-          ))
+          (() => {
+            const pairs: ClusteredSegment[][] = [];
+            for (let i = 0; i < entry.segments.length; i += 2) {
+              pairs.push(entry.segments.slice(i, i + 2));
+            }
+            return pairs.map((pair, pi) => (
+              <div key={pi} className="flex items-center gap-1.5">
+                <MoveChip seg={pair[0]!} />
+                {pair[1] && (
+                  <>
+                    <span className="opacity-50 select-none font-bold" aria-hidden="true">·</span>
+                    <MoveChip seg={pair[1]} />
+                  </>
+                )}
+              </div>
+            ));
+          })()
         )}
       </div>
     </li>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import { Board } from '@/engine/board';
-import type { DiceValue, Move, MoveFrom, MoveTo, Player } from '@/engine/types';
 import { getValidDestinations } from '@/engine/moveValidator';
+import type { BoardState, DiceRoll, DiceValue, Move, MoveFrom, MoveTo, Player } from '@/engine/types';
 import { useCanvasResize } from '@/hooks/useCanvasResize';
 import { useGameLoop } from '@/hooks/useGameLoop';
 import {
@@ -727,9 +727,9 @@ function drawSourceHoverHighlight(
   dims: BoardDimensions,
   theme: BoardTheme,
   point: MoveFrom,
-  displayBoard: import('@/engine/types').BoardState,
+  displayBoard: BoardState,
   flipped: boolean,
-  currentPlayer: import('@/engine/types').Player,
+  currentPlayer: Player,
   now: number,
 ): void {
   const r = dims.checkerRadius;
@@ -956,7 +956,7 @@ function drawRollHint(ctx: CanvasRenderingContext2D, dims: BoardDimensions, them
  */
 function renderDiceInBar(
   ctx: CanvasRenderingContext2D,
-  rolledDice: import('@/engine/types').DiceRoll,
+  rolledDice: DiceRoll,
   remainingDice: DiceValue[],
   dims: BoardDimensions,
   theme: BoardTheme,

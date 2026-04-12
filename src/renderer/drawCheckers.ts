@@ -1,5 +1,6 @@
 import type { BoardState, MoveFrom, Player } from '@/engine/types';
 import { animState } from '@/renderer/animationState';
+import type { StackAnimation } from '@/renderer/animationState';
 import { getCheckerY, getPointX, isTopPoint } from '@/renderer/dimensions';
 import type { BoardDimensions } from '@/renderer/dimensions';
 import type { BoardTheme } from '@/renderer/themes/types';
@@ -370,7 +371,7 @@ function drawCheckerCountLabel(
  *   pop  → 0.82 → 1.0  (remaining stack "settles" after top checker leaves)
  *   push → 1.25 → 1.0  (new top checker "bounces" onto the pile)
  */
-function stackAnimScale(anim: import('@/renderer/animationState').StackAnimation): number {
+function stackAnimScale(anim: StackAnimation): number {
   const t = Math.min(1, (performance.now() - anim.startTime) / anim.duration);
   // Ease-out cubic
   const eased = 1 - Math.pow(1 - t, 3);

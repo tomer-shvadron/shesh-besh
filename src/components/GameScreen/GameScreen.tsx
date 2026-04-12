@@ -35,17 +35,9 @@ export function GameScreen(): React.JSX.Element {
   return (
     <>
       {isDesktopLayout ? (
-        <DesktopLayout
-          openNewGame={openNewGame}
-          openSettings={openSettings}
-          openHighScores={openHighScores}
-        />
+        <DesktopLayout openNewGame={openNewGame} openSettings={openSettings} openHighScores={openHighScores} />
       ) : (
-        <MobileLayout
-          openNewGame={openNewGame}
-          openSettings={openSettings}
-          openHighScores={openHighScores}
-        />
+        <MobileLayout openNewGame={openNewGame} openSettings={openSettings} openHighScores={openHighScores} />
       )}
 
       {/* Overlays & Dialogs — rendered outside the layout so they float above everything */}
@@ -92,12 +84,7 @@ function MobileLayout({
         <BoardCanvas />
       </main>
 
-      <ControlBar
-        onNewGame={openNewGame}
-        onSettings={openSettings}
-        onHighScores={openHighScores}
-        variant="mobile"
-      />
+      <ControlBar onNewGame={openNewGame} onSettings={openSettings} onHighScores={openHighScores} variant="mobile" />
 
       <NoMovesOverlay />
     </div>
@@ -121,7 +108,6 @@ function DesktopLayout({
       <TopBar />
 
       <div className="flex flex-1 min-h-0 gap-0">
-
         {/* Left sidebar */}
         <aside
           className={`flex h-full shrink-0 flex-col
@@ -160,7 +146,7 @@ function DesktopLayout({
           className={`flex h-full shrink-0 flex-col
             bg-[var(--color-surface-raised)] border-l border-[var(--color-surface-border)]
             transition-all duration-200
-            ${rightOpen ? 'w-56' : 'w-8'}`}
+            ${rightOpen ? 'w-72' : 'w-8'}`}
         >
           <button
             onClick={() => setRightOpen((o) => !o)}
@@ -177,7 +163,6 @@ function DesktopLayout({
             </div>
           )}
         </aside>
-
       </div>
 
       <NoMovesOverlay />

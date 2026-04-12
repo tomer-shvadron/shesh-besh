@@ -49,7 +49,7 @@ export function useAiTurn(): void {
     useGameStore.getState().handleAiRollDice();
 
     const stateAfterRoll = useGameStore.getState();
-    const { board, currentPlayer, dice, difficulty, legalMovesForTurn } = stateAfterRoll;
+    const { board, currentPlayer, dice, remainingDice, difficulty, legalMovesForTurn } = stateAfterRoll;
 
     // No legal moves — confirm immediately (auto-skip)
     if (legalMovesForTurn.length === 0 || !dice) {
@@ -58,8 +58,9 @@ export function useAiTurn(): void {
       return;
     }
 
-    // Step 2: Ask the AI worker for the best move sequence
-    const request: AiRequest = { board, player: currentPlayer, dice, difficulty };
+    // Step 2: Ask the AI worker for the best move sequence.
+    // Pass remainingDice (not the raw DiceRoll) so the AI sees all 4 dice on doubles.
+    const request: AiRequest = { board, player: currentPlayer, dice: remainingDice, difficulty };
 
     requestAiMove(request)
       .then((response) => {
