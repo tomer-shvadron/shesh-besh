@@ -11,6 +11,7 @@ export interface GameState {
   remainingDice: DiceValue[];
   pendingMoves: Move[];        // Moves made this turn, not yet confirmed
   moveHistory: TurnMoves[];    // Confirmed turns (for undo)
+  diceHistory: (DiceRoll | null)[];  // Dice rolled per confirmed turn (parallel to moveHistory)
   boardHistory: BoardState[];  // Board snapshots for undo (one per confirmed turn)
   openingRolls: { white: DiceValue | null; black: DiceValue | null };
   winner: Player | null;
@@ -41,6 +42,7 @@ export function createInitialState(opts: GameControllerOptions): GameState {
     remainingDice: [],
     pendingMoves: [],
     moveHistory: [],
+    diceHistory: [],
     boardHistory: [],
     openingRolls: { white: null, black: null },
     winner: null,
@@ -81,7 +83,7 @@ export function rollOpeningDie(state: GameState, player: Player, forcedValue?: D
       ...state,
       openingRolls: nextRolls,
       currentPlayer: firstPlayer,
-      phase: 'moving',
+      phase: 'opening-roll-done',
       dice: openingDice,
       remainingDice,
       legalMovesForTurn,
@@ -90,6 +92,21 @@ export function rollOpeningDie(state: GameState, player: Player, forcedValue?: D
   }
 
   return { ...state, openingRolls: nextRolls };
+}
+
+/**
+ * Confirm the opening roll result and begin the first turn.
+ * Transitions from 'opening-roll-done' to 'moving' (or 'ai-thinking' if AI goes first in pva mode).
+ */
+export function confirmOpeningRoll(state: GameState): GameState {
+  if (state.phase !== 'opening-roll-done') {
+    return state;
+  }
+
+  const nextPhase: GamePhase =
+    state.gameMode === 'pva' && state.currentPlayer === 'black' ? 'ai-thinking' : 'moving';
+
+  return { ...state, phase: nextPhase };
 }
 
 /**
@@ -212,6 +229,7 @@ export function confirmTurn(state: GameState): GameState {
       board: nextBoardState,
       boardHistory: [...state.boardHistory, state.board],
       moveHistory: [...state.moveHistory, state.pendingMoves],
+      diceHistory: [...state.diceHistory, state.dice],
       phase: 'game-over',
       winner: state.currentPlayer,
       pendingMoves: [],
@@ -228,6 +246,7 @@ export function confirmTurn(state: GameState): GameState {
     board: nextBoardState,
     boardHistory: [...state.boardHistory, state.board],
     moveHistory: [...state.moveHistory, state.pendingMoves],
+    diceHistory: [...state.diceHistory, state.dice],
     currentPlayer: nextPlayer,
     phase: nextPhase,
     dice: null,
@@ -251,6 +270,7 @@ export function skipTurn(state: GameState): GameState {
     ...state,
     boardHistory: [...state.boardHistory, state.board],
     moveHistory: [...state.moveHistory, []],
+    diceHistory: [...state.diceHistory, state.dice],
     currentPlayer: nextPlayer,
     phase: nextPhase,
     dice: null,
@@ -284,6 +304,7 @@ export function undoTurn(state: GameState): GameState {
     board: prevBoard,
     boardHistory: prevHistory,
     moveHistory: prevMoveHistory,
+    diceHistory: state.diceHistory.slice(0, -1),
     currentPlayer: prevPlayer,
     phase: 'rolling',
     dice: null,
@@ -329,6 +350,45 @@ export function resumeGame(state: GameState): GameState {
  */
 export function dismissNoMovesMessage(state: GameState): GameState {
   return { ...state, noMovesMessage: false };
+}
+
+/**
+ * Roll dice for the AI player's turn.
+ * Transitions from 'ai-thinking' to 'moving'.
+ * If dice are already set (e.g., from opening roll), reuses them instead of rolling fresh.
+ */
+export function rollAiDice(state: GameState, forcedRoll?: DiceRoll): GameState {
+  if (state.phase !== 'ai-thinking') {
+    return state;
+  }
+
+  // Reuse existing dice when already set (e.g., from the opening roll)
+  if (state.dice !== null && state.remainingDice.length > 0) {
+    const board = Board.fromState(state.board);
+    const legalMovesForTurn = generateLegalMoves(board, state.currentPlayer, state.remainingDice);
+    return {
+      ...state,
+      phase: 'moving',
+      pendingMoves: [],
+      legalMovesForTurn,
+      noMovesMessage: legalMovesForTurn.length === 0,
+    };
+  }
+
+  const roll = forcedRoll ?? rollDice();
+  const board = Board.fromState(state.board);
+  const remainingDice = getMovesFromRoll(roll);
+  const legalMovesForTurn = generateLegalMoves(board, state.currentPlayer, remainingDice);
+
+  return {
+    ...state,
+    dice: roll,
+    remainingDice,
+    phase: 'moving',
+    pendingMoves: [],
+    legalMovesForTurn,
+    noMovesMessage: legalMovesForTurn.length === 0,
+  };
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────

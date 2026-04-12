@@ -23,7 +23,9 @@ export interface BoardDimensions {
  * The board has 3:2 aspect ratio. Padding is the walnut frame area.
  */
 export function computeBoardDimensions(cssWidth: number, cssHeight: number): BoardDimensions {
-  const padding = Math.round(cssWidth * 0.03);
+  // Side padding is wide enough to give the bear-off progress bars a comfortable
+  // centered position in the visible golden frame area on each side of the board.
+  const padding = Math.round(cssWidth * 0.07);
   const barWidth = Math.round(cssWidth * 0.042);
 
   const boardLeft = padding;
@@ -43,10 +45,17 @@ export function computeBoardDimensions(cssWidth: number, cssHeight: number): Boa
   // Triangles take ~43% of board height
   const triHeight = Math.round(boardHeight * 0.43);
 
-  // Checker radius is sized to fit snugly in a triangle slot
-  // triWidth / 2 gives the maximum checker radius; we use 90% of that
-  const checkerRadius = Math.round((triWidth / 2) * 0.88);
-  const checkerDiameter = checkerRadius * 2;
+  // Checker radius is sized to fit snugly in a triangle slot.
+  // It is also capped by the board height so two full stacks (top row + bottom row,
+  // each up to MAX_VISIBLE_STACK=5 checkers) always fit without overlapping.
+  //
+  // Derivation: stack height = r + 4 * spacing ≈ r + 4 * 1.76r = 8.04r
+  // Two stacks + 10% breathing room: 2 * 8.04r ≤ 0.9 * boardHeight → r ≤ boardHeight / 17.87
+  // We use 18 as the divisor to keep a comfortable gap.
+  const radiusFromWidth  = Math.round((triWidth / 2) * 0.80);
+  const radiusFromHeight = Math.floor(boardHeight / 20);
+  const checkerRadius    = Math.min(radiusFromWidth, radiusFromHeight);
+  const checkerDiameter  = checkerRadius * 2;
 
   // In a stack, checkers are spaced slightly less than a full diameter so they
   // overlap a bit when there are many. Full diameter up to 5; compressed beyond.
@@ -77,29 +86,31 @@ export function computeBoardDimensions(cssWidth: number, cssHeight: number): Boa
 }
 
 /**
- * Visual layout (from white's perspective):
+ * Visual layout (from white's perspective, boardFlipped = false):
  *
  * Top row (left→right):    [12][13][14][15][16][17] | BAR | [18][19][20][21][22][23]
  * Bottom row (left→right): [11][10][ 9][ 8][ 7][ 6] | BAR | [ 5][ 4][ 3][ 2][ 1][ 0]
  *
- * Left half columns (0-5 left-to-right):
- *   Top row:    col0=pt12, col1=pt13, col2=pt14, col3=pt15, col4=pt16, col5=pt17
- *   Bottom row: col0=pt11, col1=pt10, col2=pt9,  col3=pt8,  col4=pt7,  col5=pt6
+ * When boardFlipped = true (bear-off / home on the LEFT):
  *
- * Right half columns (0-5 left-to-right):
- *   Top row:    col0=pt18, col1=pt19, col2=pt20, col3=pt21, col4=pt22, col5=pt23
- *   Bottom row: col0=pt5,  col1=pt4,  col2=pt3,  col3=pt2,  col4=pt1,  col5=pt0
+ * Top row (left→right):    [23][22][21][20][19][18] | BAR | [17][16][15][14][13][12]
+ * Bottom row (left→right): [ 0][ 1][ 2][ 3][ 4][ 5] | BAR | [ 6][ 7][ 8][ 9][10][11]
  */
-export function getPointX(dims: BoardDimensions, pointIndex: number): number {
+export function getPointX(dims: BoardDimensions, pointIndex: number, boardFlipped = false): number {
+  if (boardFlipped) {
+    const { col, isRight } = getPointColumnFlipped(pointIndex);
+    const halfLeft = isRight ? dims.rightHalfLeft : dims.leftHalfLeft;
+    return halfLeft + col * dims.triWidth + dims.triWidth / 2;
+  }
+
   const col = getPointColumn(pointIndex);
   const isRight = pointIndex >= 18 || pointIndex <= 5;
-
   const halfLeft = isRight ? dims.rightHalfLeft : dims.leftHalfLeft;
   return halfLeft + col * dims.triWidth + dims.triWidth / 2;
 }
 
 /**
- * Returns the column index (0-5, left to right) within its half for a given point.
+ * Returns the column index (0-5, left to right) within its half for a given point (normal layout).
  */
 function getPointColumn(pointIndex: number): number {
   // Top row left half: 12→col0, 13→col1, 14→col2, 15→col3, 16→col4, 17→col5
@@ -119,6 +130,27 @@ function getPointColumn(pointIndex: number): number {
     return 5 - pointIndex;
   }
   return 0;
+}
+
+/**
+ * Returns the column and half for a given point in the flipped (mirrored) layout.
+ * Flipped layout places white's home (points 0-5) in the bottom-left.
+ */
+function getPointColumnFlipped(pointIndex: number): { col: number; isRight: boolean } {
+  // Top-left: [23][22][21][20][19][18] → col 0-5
+  if (pointIndex >= 18 && pointIndex <= 23) {
+    return { col: 23 - pointIndex, isRight: false };
+  }
+  // Top-right: [17][16][15][14][13][12] → col 0-5
+  if (pointIndex >= 12 && pointIndex <= 17) {
+    return { col: 17 - pointIndex, isRight: true };
+  }
+  // Bottom-left: [0][1][2][3][4][5] → col 0-5
+  if (pointIndex >= 0 && pointIndex <= 5) {
+    return { col: pointIndex, isRight: false };
+  }
+  // Bottom-right: [6][7][8][9][10][11] → col 0-5
+  return { col: pointIndex - 6, isRight: true };
 }
 
 /** Returns true if the given point is on the top row (triangles point down). */

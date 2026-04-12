@@ -15,6 +15,8 @@ export function useSettingsPersistence(): void {
   const setSoundEnabled = useSettingsStore((s) => s.setSoundEnabled);
   const setDefaultDifficulty = useSettingsStore((s) => s.setDefaultDifficulty);
   const setTutorialSeen = useSettingsStore((s) => s.setTutorialSeen);
+  const setBoardFlipped = useSettingsStore((s) => s.setBoardFlipped);
+  const setSettingsLoaded = useSettingsStore((s) => s.setSettingsLoaded);
 
   // Load from DB on mount
   useEffect(() => {
@@ -23,17 +25,25 @@ export function useSettingsPersistence(): void {
     db.settings
       .get(SETTINGS_ID)
       .then((record) => {
-        if (cancelled || !record) {
+        if (cancelled) {
           return;
         }
-        setTheme(record.theme);
-        setTextureMode(record.textureMode);
-        setSoundEnabled(record.soundEnabled);
-        setDefaultDifficulty(record.defaultDifficulty);
-        setTutorialSeen(record.tutorialSeen ?? false);
+        if (record) {
+          setTheme(record.theme);
+          setTextureMode(record.textureMode);
+          setSoundEnabled(record.soundEnabled);
+          setDefaultDifficulty(record.defaultDifficulty);
+          setTutorialSeen(record.tutorialSeen ?? false);
+          setBoardFlipped(record.boardFlipped ?? false);
+        }
+        // Mark settings as loaded regardless of whether a record existed
+        setSettingsLoaded(true);
       })
       .catch(() => {
-        // DB read failed — use defaults already in store
+        // DB read failed — use defaults already in store, but mark as loaded
+        if (!cancelled) {
+          setSettingsLoaded(true);
+        }
       });
 
     return () => {
@@ -53,6 +63,7 @@ export function useSettingsPersistence(): void {
         soundEnabled: state.soundEnabled,
         defaultDifficulty: state.defaultDifficulty,
         tutorialSeen: state.tutorialSeen,
+        boardFlipped: state.boardFlipped,
       });
     });
 

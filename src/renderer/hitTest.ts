@@ -20,7 +20,12 @@ export type HitZone =
  * @param dims - current board dimensions
  * @returns HitZone describing what was clicked, or null for non-interactive areas
  */
-export function hitTest(x: number, y: number, dims: BoardDimensions): HitZone {
+export function hitTest(x: number, y: number, dims: BoardDimensions, boardFlipped = false): HitZone {
+  // ── Bear-off zone: checked FIRST because the visual glow circle can extend into board area ─
+  if (isBearOffZone(x, y, dims, boardFlipped)) {
+    return { type: 'bearOff' };
+  }
+
   // ── Outside playing area entirely ────────────────────────────────────────────
   if (
     x < dims.boardLeft ||
@@ -28,10 +33,6 @@ export function hitTest(x: number, y: number, dims: BoardDimensions): HitZone {
     y < dims.boardTop ||
     y > dims.boardTop + dims.boardHeight
   ) {
-    // Check bear-off zone in frame on right side
-    if (isBearOffZone(x, y, dims)) {
-      return { type: 'bearOff' };
-    }
     return null;
   }
 
@@ -55,19 +56,20 @@ export function hitTest(x: number, y: number, dims: BoardDimensions): HitZone {
   const boardMidY = dims.boardTop + dims.boardHeight / 2;
   const isTopRow = y < boardMidY;
 
-  const pointIndex = resolvePointIndex(col, isTopRow, isRightHalf);
+  const pointIndex = boardFlipped
+    ? resolvePointIndexFlipped(col, isTopRow, isRightHalf)
+    : resolvePointIndex(col, isTopRow, isRightHalf);
   return { type: 'point', index: pointIndex };
 }
 
 // ─── Point index resolution ───────────────────────────────────────────────────
 
 /**
- * Convert a (col, isTopRow, isRightHalf) triple to a 0-based point index.
- *
- * Top row left  half: col0=12, col1=13, col2=14, col3=15, col4=16, col5=17
- * Top row right half: col0=18, col1=19, col2=20, col3=21, col4=22, col5=23
- * Bot row left  half: col0=11, col1=10, col2=9,  col3=8,  col4=7,  col5=6
- * Bot row right half: col0=5,  col1=4,  col2=3,  col3=2,  col4=1,  col5=0
+ * Normal layout:
+ * Top row left  half: col0=12, col1=13 … col5=17
+ * Top row right half: col0=18, col1=19 … col5=23
+ * Bot row left  half: col0=11, col1=10 … col5=6
+ * Bot row right half: col0=5,  col1=4  … col5=0
  */
 function resolvePointIndex(col: number, isTopRow: boolean, isRightHalf: boolean): number {
   if (isTopRow && !isRightHalf) {
@@ -83,15 +85,41 @@ function resolvePointIndex(col: number, isTopRow: boolean, isRightHalf: boolean)
   return 5 - col;
 }
 
+/**
+ * Flipped layout (bear-off on the left):
+ * Top row left  half: col0=23, col1=22 … col5=18
+ * Top row right half: col0=17, col1=16 … col5=12
+ * Bot row left  half: col0=0,  col1=1  … col5=5
+ * Bot row right half: col0=6,  col1=7  … col5=11
+ */
+function resolvePointIndexFlipped(col: number, isTopRow: boolean, isRightHalf: boolean): number {
+  if (isTopRow && !isRightHalf) {
+    return 23 - col;
+  }
+  if (isTopRow && isRightHalf) {
+    return 17 - col;
+  }
+  if (!isTopRow && !isRightHalf) {
+    return col;
+  }
+  // !isTopRow && isRightHalf
+  return 6 + col;
+}
+
 // ─── Bear-off zone detection ──────────────────────────────────────────────────
 
 /**
- * Returns true if the click is in the bear-off tray area (right side of frame).
- * Bear-off zone spans the full right padding column.
+ * Returns true if the pointer falls anywhere in the outer strip to the correct
+ * side of the board — i.e. the entire area outside the board edge on the
+ * bear-off side.  This makes drag-to-eject work anywhere in that region, not
+ * just over the small highlight dot.
+ *
+ *   Normal layout  → bear-off strip is to the RIGHT  (x > board right edge)
+ *   Flipped layout → bear-off strip is to the LEFT   (x < board left edge)
  */
-function isBearOffZone(x: number, y: number, dims: BoardDimensions): boolean {
-  const rightEdge = dims.boardLeft + dims.boardWidth;
-  const isInRightPadding = x > rightEdge && x < dims.width;
-  const isInBoardVertical = y >= dims.boardTop && y <= dims.boardTop + dims.boardHeight;
-  return isInRightPadding && isInBoardVertical;
+function isBearOffZone(x: number, _y: number, dims: BoardDimensions, boardFlipped: boolean): boolean {
+  if (boardFlipped) {
+    return x < dims.boardLeft;
+  }
+  return x > dims.boardLeft + dims.boardWidth;
 }

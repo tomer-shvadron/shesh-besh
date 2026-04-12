@@ -1,25 +1,46 @@
-import type { Move, MoveFrom, MoveTo } from '@/engine/types';
+import type { DiceRoll, Move, MoveFrom, MoveTo } from '@/engine/types';
 import { useGameStore } from '@/state/game.store';
+
+export interface MoveSegment {
+  from: string;
+  to: string;
+}
+
+export interface ClusteredSegment {
+  from: string;
+  to: string;
+  count: number;
+}
 
 export interface MoveEntry {
   turn: number;
   player: 'white' | 'black';
-  notation: string;
+  segments: ClusteredSegment[];
+  dice: DiceRoll | null;
+  isEmpty: boolean;
+}
+
+function clusterSegments(raw: MoveSegment[]): ClusteredSegment[] {
+  const result: ClusteredSegment[] = [];
+  for (const seg of raw) {
+    const last = result[result.length - 1];
+    if (last && last.from === seg.from && last.to === seg.to) {
+      last.count++;
+    } else {
+      result.push({ from: seg.from, to: seg.to, count: 1 });
+    }
+  }
+  return result;
 }
 
 function pointLabel(p: MoveFrom | MoveTo): string {
-  if (p === 'bar') {
-    return 'bar';
-  }
-  if (p === 'off') {
-    return 'off';
-  }
-  // Convert 0-based index to traditional 1-based point number
+  if (p === 'bar') { return 'bar'; }
+  if (p === 'off') { return 'off'; }
   return String((p as number) + 1);
 }
 
-function moveNotation(move: Move): string {
-  return `${pointLabel(move.from)}/${pointLabel(move.to)}`;
+function moveToSegment(move: Move): MoveSegment {
+  return { from: pointLabel(move.from), to: pointLabel(move.to) };
 }
 
 export interface MoveHistoryLogicReturn {
@@ -29,21 +50,25 @@ export interface MoveHistoryLogicReturn {
 
 export function useMoveHistoryLogic(): MoveHistoryLogicReturn {
   const moveHistory = useGameStore((s) => s.moveHistory);
+  const diceHistory = useGameStore((s) => s.diceHistory);
   const currentPlayer = useGameStore((s) => s.currentPlayer);
 
   const entries: MoveEntry[] = moveHistory.map((turnMoves, index) => {
-    // Alternate players: turn 0 = player who went first, etc.
-    // We infer the player based on parity of confirmed turns and currentPlayer
     const turnsCompleted = moveHistory.length;
     const turnsFromNow = turnsCompleted - index;
-    // currentPlayer has NOT yet taken a turn; the last completed turn was by the OTHER player
     const lastTurnPlayer = currentPlayer === 'white' ? 'black' : 'white';
-    // Odd turns back from now alternate
     const player = turnsFromNow % 2 === 1 ? lastTurnPlayer : currentPlayer;
 
-    const notation = turnMoves.length > 0 ? turnMoves.map(moveNotation).join(', ') : '(no moves)';
+    const segments = clusterSegments(turnMoves.map(moveToSegment));
+    const dice = diceHistory[index] ?? null;
 
-    return { turn: index + 1, player, notation };
+    return {
+      turn: index + 1,
+      player,
+      segments,
+      dice,
+      isEmpty: turnMoves.length === 0,
+    };
   });
 
   return {

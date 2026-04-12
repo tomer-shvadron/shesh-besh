@@ -27,10 +27,18 @@ export interface DiceAnimation {
   finalValues: DiceValue[];
 }
 
+export interface StackAnimation {
+  type: 'pop' | 'push'; // pop = checker left (remaining stack settles), push = checker arrived
+  point: number | 'bar';
+  startTime: number;
+  duration: number;
+}
+
 export interface AnimationState {
   checkerAnimations: CheckerAnimation[];
   diceAnimation: DiceAnimation | null;
   winCelebration: boolean;
+  stackAnimations: StackAnimation[];
 }
 
 // ── Singleton ──────────────────────────────────────────────────────────────────
@@ -39,6 +47,7 @@ export const animState: AnimationState = {
   checkerAnimations: [],
   diceAnimation: null,
   winCelebration: false,
+  stackAnimations: [],
 };
 
 // ── Query ──────────────────────────────────────────────────────────────────────
@@ -62,6 +71,7 @@ function fromCoords(
   dims: BoardDimensions,
   player: Player,
   count: number,
+  boardFlipped: boolean,
 ): { x: number; y: number } {
   if (from === 'bar') {
     const barCx = dims.barLeft + dims.barWidth / 2;
@@ -74,7 +84,7 @@ function fromCoords(
     const startY = halfMidY - ((Math.min(count, 5) - 1) / 2) * dims.checkerSpacing;
     return { x: barCx, y: startY + visibleIdx * dims.checkerSpacing };
   }
-  const cx = getPointX(dims, from);
+  const cx = getPointX(dims, from, boardFlipped);
   // The top checker of the stack is the one being moved
   const checkerIdx = Math.min(count - 1, 4);
   return { x: cx, y: getCheckerY(dims, from, checkerIdx) };
@@ -90,16 +100,23 @@ function toCoords(
   dims: BoardDimensions,
   player: Player,
   countAfter: number,
+  boardFlipped: boolean,
 ): { x: number; y: number } {
   if (to === 'off') {
-    // Bear-off area: right edge of board
-    const x = dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
-    const y = player === 'white'
-      ? dims.boardTop + dims.boardHeight * 0.85
-      : dims.boardTop + dims.boardHeight * 0.15;
+    // Land exactly on the bear-off highlight dot (vertically centered, x clamped to canvas).
+    // Must match the position computed in drawBearOffHighlight in drawHighlights.ts.
+    const xRaw = boardFlipped
+      ? dims.boardLeft - dims.padding * 0.5
+      : dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
+    const glowR = dims.checkerRadius * 0.81; // 0.45 (base radius) × 1.8 (glow multiplier)
+    const x = boardFlipped
+      ? Math.max(xRaw, glowR + 2)
+      : Math.min(xRaw, dims.width - glowR - 2);
+    const y = dims.boardTop + dims.boardHeight / 2;
+    void player; // player isn't used for y-position (centered for both)
     return { x, y };
   }
-  const cx = getPointX(dims, to);
+  const cx = getPointX(dims, to, boardFlipped);
   const cy = getCheckerY(dims, to, Math.min(countAfter, 4));
   return { x: cx, y: cy };
 }
@@ -109,6 +126,8 @@ function toCoords(
  * `fromCount` is the number of checkers at the source BEFORE the move.
  * `toCount` is the number of checkers at the destination AFTER the move (including the moved one).
  * `isHit` indicates whether an opponent's checker was hit.
+ * `skipMain` — when true, skips the main checker-move arc (e.g. after a drag-drop where the
+ *   checker already appears at the destination). Hit animations are still played.
  */
 export function startCheckerMove(
   from: MoveFrom,
@@ -118,23 +137,66 @@ export function startCheckerMove(
   isHit: boolean,
   fromCount = 1,
   toCount = 1,
+  boardFlipped = false,
+  skipMain = false,
 ): void {
-  const src = fromCoords(from, dims, player, fromCount);
-  const dst = toCoords(to, dims, player, toCount);
+  const dst = toCoords(to, dims, player, toCount, boardFlipped);
   const now = performance.now();
 
-  const anim: CheckerAnimation = {
-    type: isHit ? 'checker-hit' : 'checker-move',
-    fromX: src.x,
-    fromY: src.y,
-    toX: dst.x,
-    toY: dst.y,
-    startTime: now,
-    duration: isHit ? 400 : 300,
-    checkerPlayer: player,
-  };
+  if (!skipMain) {
+    // Animate the current player's checker moving from source to destination (normal arc)
+    const src = fromCoords(from, dims, player, fromCount, boardFlipped);
+    animState.checkerAnimations.push({
+      type: 'checker-move',
+      fromX: src.x,
+      fromY: src.y,
+      toX: dst.x,
+      toY: dst.y,
+      startTime: now,
+      duration: 300,
+      checkerPlayer: player,
+    });
+  }
 
-  animState.checkerAnimations.push(anim);
+  // For hits: also animate the opponent's blot flying to bar (dramatic high arc)
+  if (isHit && to !== 'off') {
+    const opponent: Player = player === 'white' ? 'black' : 'white';
+    const bar = getBarLandingCoords(dims, player);
+    animState.checkerAnimations.push({
+      type: 'checker-hit',
+      fromX: dst.x,
+      fromY: dst.y,
+      toX: bar.x,
+      toY: bar.y,
+      startTime: now,
+      duration: 400,
+      checkerPlayer: opponent,
+    });
+  }
+}
+
+// ── Drag return animation ──────────────────────────────────────────────────────
+
+/**
+ * Animate a dragged checker flying back to its original board position.
+ */
+export function startDragReturn(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  player: Player,
+): void {
+  animState.checkerAnimations.push({
+    type: 'checker-move',
+    fromX,
+    fromY,
+    toX,
+    toY,
+    startTime: performance.now(),
+    duration: 250,
+    checkerPlayer: player,
+  });
 }
 
 // ── Dice animation ─────────────────────────────────────────────────────────────
@@ -158,12 +220,32 @@ export function clearWinCelebration(): void {
   animState.winCelebration = false;
 }
 
+// ── Stack animations ───────────────────────────────────────────────────────────
+
+/**
+ * Animate the remaining stack when a checker leaves (it "settles" inward, scale 0.82→1).
+ */
+export function startStackPop(point: number | 'bar'): void {
+  animState.stackAnimations = animState.stackAnimations.filter((a) => a.point !== point);
+  animState.stackAnimations.push({ type: 'pop', point, startTime: performance.now(), duration: 320 });
+}
+
+/**
+ * Animate the new top checker when a checker arrives (it "bounces" on, scale 1.25→1).
+ */
+export function startStackPush(point: number | 'off'): void {
+  if (point === 'off') { return; } // bear-off tray has no stack animation
+  animState.stackAnimations = animState.stackAnimations.filter((a) => a.point !== point);
+  animState.stackAnimations.push({ type: 'push', point, startTime: performance.now(), duration: 260 });
+}
+
 // ── Clear all (call on new game) ───────────────────────────────────────────────
 
 export function clearAllAnimations(): void {
   animState.checkerAnimations = [];
   animState.diceAnimation = null;
   animState.winCelebration = false;
+  animState.stackAnimations = [];
 }
 
 // ── Tick (remove finished animations) ─────────────────────────────────────────
@@ -179,6 +261,10 @@ export function tickAnimations(now: number): void {
   ) {
     animState.diceAnimation = null;
   }
+
+  animState.stackAnimations = animState.stackAnimations.filter(
+    (a) => now - a.startTime < a.duration,
+  );
 }
 
 // ── Bar landing coords (used by drawCheckerAnimation) ─────────────────────────

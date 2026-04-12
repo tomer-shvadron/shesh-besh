@@ -1,9 +1,38 @@
 import { describe, expect, it } from 'vitest';
 
 import { Board } from '@/engine/board';
+import { createInitialState, rollTurnDice, selectMove } from '@/engine/gameController';
 import { generateLegalMoves, getValidDestinations } from '@/engine/moveValidator';
 import type { BoardState } from '@/engine/types';
 
+
+describe('multi-move: same checker moved twice in a turn', () => {
+  it('should allow the same checker to be selected as source for a second move after a pending first move', () => {
+    // White at point 12 with dice [6, 3]
+    // Move 1: 12→6 (die 6). Now checker is at 6.
+    // Move 2: 6→3 (die 3). Should be valid.
+    const board = Board.initial();
+    // After move1: checker moved from 12 to 6
+    const boardAfterMove1 = board.applyMove({ from: 12, to: 6, dieUsed: 6 }, 'white');
+    // getValidDestinations from 6 with die [3] should return [3]
+    const dests = getValidDestinations(boardAfterMove1, 'white', 6, [3]);
+    expect(dests).toContain(3);
+  });
+
+  it('should include the second move in legalMovesForTurn after the first move', () => {
+    // From initial board with dice [6, 3], white moves 12→6 via selectMove
+    let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+    // Manually set up the moving phase with dice [6,3]
+    state = rollTurnDice({ ...state, phase: 'rolling' }, [6, 3]);
+    // Apply first move
+    state = selectMove(state, { from: 12, to: 6, dieUsed: 6 });
+    // legalMovesForTurn should still have moves, specifically from 6 with die 3
+    expect(state.legalMovesForTurn.length).toBeGreaterThan(0);
+    // We should be able to move checker from 6
+    const canMoveFrom6 = state.legalMovesForTurn.some((seq) => seq.some((m) => m.from === 6));
+    expect(canMoveFrom6).toBe(true);
+  });
+});
 
 describe('generateLegalMoves()', () => {
   describe('basic single moves', () => {
@@ -371,6 +400,184 @@ describe('generateLegalMoves()', () => {
       const dests = getValidDestinations(board, 'white', 2, [3]);
 
       expect(dests).toContain('off');
+    });
+  });
+
+  describe('getValidDestinations()', () => {
+    describe('bar re-entry', () => {
+      it('should return entry points for white from bar', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 1, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 'bar', [2, 5]);
+
+        // die=2 → point 22, die=5 → point 19
+        expect(dests).toContain(22);
+        expect(dests).toContain(19);
+      });
+
+      it('should return entry points for black from bar', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 0, black: 1 },
+          borneOff: { white: 0, black: 0 },
+        };
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'black', 'bar', [3, 4]);
+
+        // die=3 → point 2, die=4 → point 3
+        expect(dests).toContain(2);
+        expect(dests).toContain(3);
+      });
+
+      it('should not include blocked entry points (2+ opponent checkers)', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 1, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        // Block point 22 (die=2 for white) with 2 black checkers
+        state.points[22] = { player: 'black', count: 2 };
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 'bar', [2, 5]);
+
+        expect(dests).not.toContain(22); // blocked
+        expect(dests).toContain(19);    // open
+      });
+
+      it('should include blot (1 opponent checker) as valid hit destination', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 1, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        // Point 22 has a black blot
+        state.points[22] = { player: 'black', count: 1 };
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 'bar', [2]);
+
+        // Can hit the blot
+        expect(dests).toContain(22);
+      });
+
+      it('should include friendly checker point as valid destination (can stack)', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 1, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        // White already has a checker at point 22 (anchor in opponent home)
+        state.points[22] = { player: 'white', count: 1 };
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 'bar', [2]);
+
+        // Can stack on own checker
+        expect(dests).toContain(22);
+      });
+
+      it('should return empty array when all entry points are blocked', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 1, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        // Block all white entry points (18-23) with 2+ black checkers
+        for (let i = 18; i <= 23; i++) {
+          state.points[i] = { player: 'black', count: 2 };
+        }
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 'bar', [1, 2, 3, 4, 5, 6]);
+
+        expect(dests).toHaveLength(0);
+      });
+
+      it('should use die values to determine entry columns correctly for white', () => {
+        // Verify the exact mapping: white die=1 → point 23, die=6 → point 18
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 1, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        const board = Board.fromState(state);
+
+        for (let die = 1; die <= 6; die++) {
+          const dests = getValidDestinations(board, 'white', 'bar', [die as 1|2|3|4|5|6]);
+          const expectedPoint = 24 - die;
+          expect(dests).toContain(expectedPoint);
+        }
+      });
+
+      it('should use die values to determine entry columns correctly for black', () => {
+        // Verify: black die=1 → point 0, die=6 → point 5
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 0, black: 1 },
+          borneOff: { white: 0, black: 0 },
+        };
+        const board = Board.fromState(state);
+
+        for (let die = 1; die <= 6; die++) {
+          const dests = getValidDestinations(board, 'black', 'bar', [die as 1|2|3|4|5|6]);
+          const expectedPoint = die - 1;
+          expect(dests).toContain(expectedPoint);
+        }
+      });
+    });
+
+    describe('hit detection (isHit scenarios)', () => {
+      it('should return blot point as valid destination for normal move', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 0, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        state.points[10] = { player: 'white', count: 2 };
+        state.points[7] = { player: 'black', count: 1 }; // blot
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 10, [3]);
+
+        expect(dests).toContain(7); // can hit the blot
+      });
+
+      it('should return friendly stack point as valid destination', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 0, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        state.points[10] = { player: 'white', count: 2 };
+        state.points[7] = { player: 'white', count: 1 }; // friendly
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 10, [3]);
+
+        expect(dests).toContain(7); // can stack on own checker
+      });
+
+      it('should NOT return blocked point (2+ opponent checkers) as valid destination', () => {
+        const state: BoardState = {
+          points: Array(24).fill(null).map(() => ({ player: null as null, count: 0 })) as BoardState['points'],
+          bar: { white: 0, black: 0 },
+          borneOff: { white: 0, black: 0 },
+        };
+        state.points[10] = { player: 'white', count: 2 };
+        state.points[7] = { player: 'black', count: 2 }; // blocked
+
+        const board = Board.fromState(state);
+        const dests = getValidDestinations(board, 'white', 10, [3]);
+
+        expect(dests).not.toContain(7);
+      });
     });
   });
 });

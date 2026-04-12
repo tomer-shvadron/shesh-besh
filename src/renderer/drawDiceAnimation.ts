@@ -31,9 +31,9 @@ export function drawDiceAnimation(
     return false;
   }
 
-  const count = anim.finalValues.length;
-  const dieSize = Math.min(dims.barWidth * 0.72, 32);
-  const spacing = dieSize * 1.3;
+  const count = anim.finalValues.length; // always 2 now (doubles handled via badge)
+  const dieSize = Math.min(dims.barWidth * 0.88, 42);
+  const spacing = dieSize * 1.55;
   const totalH = dieSize * count + spacing * (count - 1);
   const barCx = dims.barLeft + dims.barWidth / 2;
   const startY = dims.boardTop + dims.boardHeight / 2 - totalH / 2 + dieSize / 2;

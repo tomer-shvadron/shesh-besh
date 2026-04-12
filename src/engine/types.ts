@@ -25,7 +25,7 @@ export interface BoardState {
   borneOff: Record<Player, number>;
 }
 
-export type GamePhase = 'not-started' | 'opening-roll' | 'rolling' | 'moving' | 'ai-thinking' | 'game-over' | 'paused';
+export type GamePhase = 'not-started' | 'opening-roll' | 'opening-roll-done' | 'rolling' | 'moving' | 'ai-thinking' | 'game-over' | 'paused';
 
 export type GameMode = 'pvp' | 'pva';
 

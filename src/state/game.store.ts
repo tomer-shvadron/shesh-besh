@@ -2,11 +2,13 @@ import { create } from 'zustand';
 
 import { Board } from '@/engine/board';
 import {
+  confirmOpeningRoll,
   confirmTurn,
   createInitialState,
   dismissNoMovesMessage,
   pauseGame,
   resumeGame,
+  rollAiDice,
   rollOpeningDie,
   rollTurnDice,
   selectMove,
@@ -16,7 +18,7 @@ import {
 } from '@/engine/gameController';
 import type { GameState } from '@/engine/gameController';
 import { getValidDestinations } from '@/engine/moveValidator';
-import type { Difficulty, DiceValue, GameMode, MoveFrom, MoveTo, Player } from '@/engine/types';
+import type { Difficulty, DiceRoll, DiceValue, GameMode, Move, MoveFrom, MoveTo, Player } from '@/engine/types';
 
 interface GameStoreState extends GameState {
   // UI-only state
@@ -28,6 +30,7 @@ interface GameStoreState extends GameState {
 
   // Opening roll
   handleOpeningRoll: (player: Player) => void;
+  handleConfirmOpeningRoll: () => void;
 
   // Turn flow
   handleRollDice: () => void;
@@ -37,6 +40,10 @@ interface GameStoreState extends GameState {
   handleUndoMove: () => void;
   handleUndoTurn: () => void;
   handleSkipTurn: () => void;
+
+  // AI turn actions
+  handleAiRollDice: () => void;
+  handleAiSelectMove: (move: Move) => void;
 
   // Game control
   handlePause: () => void;
@@ -60,8 +67,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   // ── Game lifecycle ───────────────────────────────────────────────────────────
   initGame: (mode, difficulty) => {
+    // Auto-perform the opening roll (each player rolls one die; higher goes first).
+    // Keep re-rolling until there is no tie, then transition straight to 'moving'.
+    let state = createInitialState({ gameMode: mode, difficulty });
+    let attempts = 0;
+    while (state.phase === 'opening-roll' && attempts < 20) {
+      state = rollOpeningDie(state, 'white');
+      state = rollOpeningDie(state, 'black');
+      attempts++;
+    }
+
     set({
-      ...createInitialState({ gameMode: mode, difficulty }),
+      ...state,
       selectedPoint: null,
       validDestinations: [],
     });
@@ -71,6 +88,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   handleOpeningRoll: (player) => {
     const state = get();
     const next = rollOpeningDie(state, player);
+    set({ ...next, selectedPoint: null, validDestinations: [] });
+  },
+
+  // ── Confirm opening roll (start first turn) ─────────────────────────────────
+  handleConfirmOpeningRoll: () => {
+    const state = get();
+    const next = confirmOpeningRoll(state);
     set({ ...next, selectedPoint: null, validDestinations: [] });
   },
 
@@ -117,14 +141,19 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const move = { from, to, dieUsed };
     const next = selectMove(state, move);
 
-    // After the move, check if all dice are used → auto-confirm if none remaining
-    if (next.remainingDice.length === 0) {
-      const confirmed = confirmTurn(next);
-      set({ ...confirmed, selectedPoint: null, validDestinations: [] });
-      return;
-    }
-
+    // Always set the intermediate state so the animation effect can fire this render cycle.
     set({ ...next, selectedPoint: null, validDestinations: [] });
+
+    // Defer auto-confirm to the next task so animations have time to start.
+    if (next.remainingDice.length === 0 || next.legalMovesForTurn.length === 0) {
+      setTimeout(() => {
+        const current = get();
+        if (current.phase === 'moving') {
+          const confirmed = confirmTurn(current);
+          set({ ...confirmed, selectedPoint: null, validDestinations: [] });
+        }
+      }, 0);
+    }
   },
 
   // ── Confirm turn ─────────────────────────────────────────────────────────────
@@ -152,6 +181,22 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   handleSkipTurn: () => {
     const state = get();
     const next = skipTurn(state);
+    set({ ...next, selectedPoint: null, validDestinations: [] });
+  },
+
+  // ── AI turn actions ──────────────────────────────────────────────────────────
+  handleAiRollDice: () => {
+    const state = get();
+    const next = rollAiDice(state);
+    set({ ...next, selectedPoint: null, validDestinations: [] });
+  },
+
+  handleAiSelectMove: (move) => {
+    const state = get();
+    if (state.phase !== 'moving') {
+      return;
+    }
+    const next = selectMove(state, move);
     set({ ...next, selectedPoint: null, validDestinations: [] });
   },
 
@@ -183,7 +228,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   // ── Load persisted game state ─────────────────────────────────────────────────
   loadState: (state: GameState) => {
-    set({ ...state, selectedPoint: null, validDestinations: [] });
+    set({
+      ...state,
+      diceHistory: (state as GameState & { diceHistory?: (DiceRoll | null)[] }).diceHistory ?? [],
+      selectedPoint: null,
+      validDestinations: [],
+    });
   },
 }));
 

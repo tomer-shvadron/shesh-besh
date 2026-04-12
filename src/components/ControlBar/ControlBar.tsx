@@ -35,7 +35,7 @@ function Btn({
           ${
             disabled
               ? 'opacity-40 cursor-not-allowed text-[var(--color-text-secondary)]'
-              : 'text-[var(--color-text-primary)] hover:bg-[var(--color-surface-border)] active:opacity-80'
+              : 'cursor-pointer text-[var(--color-text-primary)] hover:bg-[var(--color-surface-border)] active:opacity-80'
           }
           ${pulse ? 'animate-pulse' : ''}`}
       >
@@ -57,7 +57,7 @@ function Btn({
         ${
           disabled
             ? 'opacity-40 cursor-not-allowed text-[var(--color-text-secondary)]'
-            : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] active:opacity-80'
+            : 'cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] active:opacity-80'
         }
         ${pulse ? 'animate-pulse' : ''}`}
     >
@@ -68,24 +68,30 @@ function Btn({
 }
 
 export function ControlBar({ onNewGame, onSettings, onHighScores, variant = 'mobile' }: ControlBarProps): React.JSX.Element {
-  const { canUndo, canConfirm, canRoll, isAiThinking, isPaused, isGameOver, onRoll, onUndo, onConfirm, onPause, onResume } =
-    useControlBarLogic();
+  const {
+    canUndo,
+    canRoll,
+    canStartGame,
+    isAiThinking,
+    isPaused,
+    isGameOver,
+    onRoll,
+    onUndo,
+    onStartGame,
+    onPause,
+    onResume,
+  } = useControlBarLogic();
 
   const allDisabled = isAiThinking || isGameOver;
 
   if (variant === 'desktop') {
     return (
       <nav className="flex flex-col gap-1">
-        <Btn label="Roll Dice" icon="🎲" onClick={onRoll} disabled={allDisabled || !canRoll} variant="desktop" />
+        {canStartGame && (
+          <Btn label="Start Game" icon="🎯" onClick={onStartGame} disabled={false} pulse={true} variant="desktop" />
+        )}
+        <Btn label="Roll Dice" icon="🎲" onClick={onRoll} disabled={allDisabled || !canRoll || canStartGame} variant="desktop" />
         <Btn label="Undo Move" icon="↩" onClick={onUndo} disabled={allDisabled || !canUndo} variant="desktop" />
-        <Btn
-          label="Confirm Turn"
-          icon="✓"
-          onClick={onConfirm}
-          disabled={allDisabled || !canConfirm}
-          pulse={canConfirm}
-          variant="desktop"
-        />
         <hr className="border-[var(--color-surface-border)] my-1" />
         {isPaused ? (
           <Btn label="Resume" icon="▶" onClick={onResume} disabled={false} variant="desktop" />
@@ -106,9 +112,10 @@ export function ControlBar({ onNewGame, onSettings, onHighScores, variant = 'mob
         bg-[var(--color-surface-raised)] border-t border-[var(--color-surface-border)]"
     >
       <Btn label="Undo" icon="↩" onClick={onUndo} disabled={allDisabled || !canUndo} variant="mobile" />
-      {canConfirm ? (
-        <Btn label="Confirm" icon="✓" onClick={onConfirm} disabled={allDisabled} pulse={true} variant="mobile" />
-      ) : (
+      {canStartGame && (
+        <Btn label="Start!" icon="🎯" onClick={onStartGame} disabled={false} pulse={true} variant="mobile" />
+      )}
+      {!canStartGame && (
         <Btn label="Roll" icon="🎲" onClick={onRoll} disabled={allDisabled || !canRoll} variant="mobile" />
       )}
       {isPaused ? (

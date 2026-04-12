@@ -20,8 +20,17 @@
   --color-text-secondary: #94a3b8;
 }
 
+/* Move history die colors — defined in :root so they work in SVG fill attributes */
+:root {
+  --color-die-bg: #f5f0e8;
+  --color-die-pip: #1a1008;
+}
+
 /* Light theme overrides */
 .light {
+  /* Move history die colors — light theme: dark die, white pips (inverted for contrast) */
+  --color-die-bg: #2a3040;
+  --color-die-pip: #f5f0e8;
   --color-board-frame: #c4a882;
   --color-board-surface: #9cae9c;
   --color-board-bar: #b8a088;

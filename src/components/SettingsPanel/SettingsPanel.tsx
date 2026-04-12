@@ -55,7 +55,7 @@ function SegmentedControl<T extends string>({
           <button
             key={opt.value}
             onClick={() => onChange(opt.value)}
-            className={`flex-1 py-2 text-xs font-medium transition-colors
+            className={`flex-1 py-2 text-xs font-medium transition-colors cursor-pointer
               ${
                 value === opt.value
                   ? 'bg-[var(--color-accent)] text-white'
@@ -71,8 +71,20 @@ function SegmentedControl<T extends string>({
 }
 
 export function SettingsPanel({ isOpen, onClose, onHowToPlay }: SettingsPanelProps): React.JSX.Element | null {
-  const { theme, textureMode, soundEnabled, defaultDifficulty, setTheme, setTextureMode, setSoundEnabled, setDefaultDifficulty } =
-    useSettingsPanelLogic();
+  const {
+    theme,
+    textureMode,
+    soundEnabled,
+    defaultDifficulty,
+    boardFlipped,
+    autoRoll,
+    setTheme,
+    setTextureMode,
+    setSoundEnabled,
+    setDefaultDifficulty,
+    setBoardFlipped,
+    setAutoRoll,
+  } = useSettingsPanelLogic();
 
   if (!isOpen) {
     return null;
@@ -98,7 +110,7 @@ export function SettingsPanel({ isOpen, onClose, onHowToPlay }: SettingsPanelPro
           <h2 className="text-lg font-bold text-[var(--color-text-primary)]">Settings</h2>
           <button
             onClick={onClose}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-xl leading-none"
+            className="cursor-pointer text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-xl leading-none"
             aria-label="Close settings"
           >
             ×
@@ -130,6 +142,11 @@ export function SettingsPanel({ isOpen, onClose, onHowToPlay }: SettingsPanelPro
                 value={textureMode}
                 onChange={setTextureMode}
               />
+              <Toggle
+                label="Home on Left"
+                checked={boardFlipped}
+                onChange={setBoardFlipped}
+              />
             </div>
           </section>
 
@@ -144,16 +161,19 @@ export function SettingsPanel({ isOpen, onClose, onHowToPlay }: SettingsPanelPro
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-4">
               Game Defaults
             </h3>
-            <SegmentedControl<Difficulty>
-              label="Default AI Difficulty"
-              options={[
-                { value: 'easy', label: 'Easy' },
-                { value: 'medium', label: 'Medium' },
-                { value: 'hard', label: 'Hard' },
-              ]}
-              value={defaultDifficulty}
-              onChange={setDefaultDifficulty}
-            />
+            <div className="flex flex-col gap-4">
+              <SegmentedControl<Difficulty>
+                label="Default AI Difficulty"
+                options={[
+                  { value: 'easy', label: 'Easy' },
+                  { value: 'medium', label: 'Medium' },
+                  { value: 'hard', label: 'Hard' },
+                ]}
+                value={defaultDifficulty}
+                onChange={setDefaultDifficulty}
+              />
+              <Toggle label="Auto Roll" checked={autoRoll} onChange={setAutoRoll} />
+            </div>
           </section>
 
           <section>
@@ -167,7 +187,7 @@ export function SettingsPanel({ isOpen, onClose, onHowToPlay }: SettingsPanelPro
               }}
               className="flex w-full items-center gap-2 rounded-lg border border-[var(--color-surface-border)]
                 px-4 py-3 text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-surface-border)]
-                transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+                transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
               aria-label="Open How to Play tutorial"
             >
               <span aria-hidden="true">📖</span>

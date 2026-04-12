@@ -96,7 +96,7 @@ function ModeStep({
         <button
           onClick={onClose}
           className="flex-1 rounded-lg border border-[var(--color-surface-border)] px-4 py-2.5
-            text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
         >
           Cancel
         </button>
@@ -106,7 +106,7 @@ function ModeStep({
           className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors
             ${
               selectedMode === 'pvp'
-                ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]'
+                ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] cursor-pointer'
                 : 'bg-[var(--color-surface-border)] text-[var(--color-text-secondary)] cursor-not-allowed'
             }`}
         >
@@ -133,7 +133,7 @@ function ModeCard({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-start rounded-xl border-2 p-4 text-left transition-all
+      className={`flex flex-col items-start rounded-xl border-2 p-4 text-left transition-all cursor-pointer
         ${
           isSelected
             ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10'
@@ -162,7 +162,7 @@ function DifficultyStep({
     <>
       <button
         onClick={onBack}
-        className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] mb-4 transition-colors"
+        className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] mb-4 transition-colors cursor-pointer"
       >
         ← Back
       </button>
@@ -175,7 +175,7 @@ function DifficultyStep({
           <button
             key={value}
             onClick={() => onSelectDifficulty(value)}
-            className={`flex items-center gap-3 rounded-xl border-2 p-3.5 text-left transition-all
+            className={`flex items-center gap-3 rounded-xl border-2 p-3.5 text-left transition-all cursor-pointer
               ${
                 selectedDifficulty === value
                   ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10'
@@ -194,7 +194,7 @@ function DifficultyStep({
       <button
         onClick={onStart}
         className="mt-6 w-full rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium
-          text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+          text-white hover:bg-[var(--color-accent-hover)] transition-colors cursor-pointer"
       >
         Start Game
       </button>

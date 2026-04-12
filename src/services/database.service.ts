@@ -9,6 +9,7 @@ export interface ActiveGameRecord {
   dice: DiceRoll | null;
   currentPlayer: Player;
   moveHistory: Move[][];
+  diceHistory: (DiceRoll | null)[];
   timerElapsed: number;
   difficulty: Difficulty;
   gameMode: GameMode;
@@ -32,6 +33,7 @@ export interface SettingsRecord {
   soundEnabled: boolean;
   defaultDifficulty: Difficulty;
   tutorialSeen?: boolean;
+  boardFlipped?: boolean;
 }
 
 class SheshBeshDatabase extends Dexie {

@@ -4,18 +4,20 @@ import type { BoardTheme } from '@/renderer/themes/types';
 /**
  * Draw the static backgammon board: frame, felt surface, triangles, bar, and bear-off areas.
  * This should be called once per frame before drawing checkers/highlights/dice.
+ * Pass boardFlipped=true to mirror the board so home is on the left.
  */
 export function drawBoard(
   ctx: CanvasRenderingContext2D,
   dims: BoardDimensions,
   theme: BoardTheme,
+  boardFlipped = false,
 ): void {
   drawFrame(ctx, dims, theme);
   drawPlayingSurface(ctx, dims, theme);
-  drawTriangles(ctx, dims, theme);
+  drawTriangles(ctx, dims, theme, boardFlipped);
   drawBar(ctx, dims, theme);
-  drawBearOffAreas(ctx, dims, theme);
-  drawPointLabels(ctx, dims, theme);
+  drawBearOffAreas(ctx, dims, theme, boardFlipped);
+  drawPointLabels(ctx, dims, theme, boardFlipped);
 }
 
 // ─── Internal drawing helpers ─────────────────────────────────────────────────
@@ -67,18 +69,10 @@ function drawTriangles(
   ctx: CanvasRenderingContext2D,
   dims: BoardDimensions,
   theme: BoardTheme,
+  boardFlipped = false,
 ): void {
-  // Draw all 24 triangles: 12 on top (pointing down), 12 on bottom (pointing up).
-  //
-  // Visual layout:
-  //  Top    left half:  col 0-5  → points 12-17
-  //  Top    right half: col 0-5  → points 18-23
-  //  Bottom left half:  col 0-5  → points 11-6
-  //  Bottom right half: col 0-5  → points 5-0
-
   for (let pointIndex = 0; pointIndex < 24; pointIndex++) {
-    const col = getColumnForPoint(pointIndex);
-    const isRight = pointIndex >= 18 || pointIndex <= 5;
+    const { col, isRight } = getColumnAndHalf(pointIndex, boardFlipped);
     const isTop = pointIndex >= 12;
 
     const halfLeft = isRight ? dims.rightHalfLeft : dims.leftHalfLeft;
@@ -143,57 +137,20 @@ function drawBar(
 }
 
 function drawBearOffAreas(
-  ctx: CanvasRenderingContext2D,
-  dims: BoardDimensions,
-  theme: BoardTheme,
+  _ctx: CanvasRenderingContext2D,
+  _dims: BoardDimensions,
+  _theme: BoardTheme,
+  _boardFlipped = false,
 ): void {
-  // Bear-off areas are indicated by subtle bracket marks on the right edge of the frame
-  // (right side = white bears off, traditionally; but we show both sides for clarity)
-
-  const labelSize = Math.max(7, dims.padding * 0.45);
-  const rightEdgeX = dims.boardLeft + dims.boardWidth + dims.padding * 0.25;
-  const centerX = rightEdgeX + dims.padding * 0.35;
-
-  ctx.font = `bold ${labelSize}px Inter, system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = theme.bearOffLabel;
-
-  // White bear-off indicator (bottom-right quadrant of frame)
-  const whiteLabelY = dims.boardTop + dims.boardHeight * 0.75;
-  ctx.fillText('W', centerX, whiteLabelY);
-
-  // Black bear-off indicator (top-right quadrant of frame)
-  const blackLabelY = dims.boardTop + dims.boardHeight * 0.25;
-  ctx.fillText('B', centerX, blackLabelY);
-
-  // Draw a short vertical bracket on the right side of the frame for each half
-  const bracketX = dims.boardLeft + dims.boardWidth + 2;
-  const bracketW = dims.padding * 0.18;
-  ctx.strokeStyle = theme.bearOffLabel;
-  ctx.lineWidth = 1.5;
-
-  // White bracket (bottom half)
-  ctx.beginPath();
-  ctx.moveTo(bracketX, dims.boardTop + dims.boardHeight / 2 + 4);
-  ctx.lineTo(bracketX + bracketW, dims.boardTop + dims.boardHeight / 2 + 4);
-  ctx.lineTo(bracketX + bracketW, dims.boardTop + dims.boardHeight - 2);
-  ctx.lineTo(bracketX, dims.boardTop + dims.boardHeight - 2);
-  ctx.stroke();
-
-  // Black bracket (top half)
-  ctx.beginPath();
-  ctx.moveTo(bracketX, dims.boardTop + 2);
-  ctx.lineTo(bracketX + bracketW, dims.boardTop + 2);
-  ctx.lineTo(bracketX + bracketW, dims.boardTop + dims.boardHeight / 2 - 4);
-  ctx.lineTo(bracketX, dims.boardTop + dims.boardHeight / 2 - 4);
-  ctx.stroke();
+  // Intentionally empty — B/W labels and brackets removed; the progress bar
+  // drawn by drawBearOffCounters (drawCheckers.ts) makes them redundant.
 }
 
 function drawPointLabels(
   ctx: CanvasRenderingContext2D,
   dims: BoardDimensions,
   theme: BoardTheme,
+  boardFlipped = false,
 ): void {
   const fontSize = Math.max(7, Math.round(dims.triWidth * 0.26));
   ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
@@ -202,8 +159,7 @@ function drawPointLabels(
   ctx.fillStyle = theme.bearOffLabel;
 
   for (let pointIndex = 0; pointIndex < 24; pointIndex++) {
-    const col = getColumnForPoint(pointIndex);
-    const isRight = pointIndex >= 18 || pointIndex <= 5;
+    const { col, isRight } = getColumnAndHalf(pointIndex, boardFlipped);
     const isTop = pointIndex >= 12;
     const halfLeft = isRight ? dims.rightHalfLeft : dims.leftHalfLeft;
     const labelX = halfLeft + col * dims.triWidth + dims.triWidth / 2;
@@ -218,20 +174,45 @@ function drawPointLabels(
   }
 }
 
-// ─── Column index helper ────────────────────────────────────────────────────
+// ─── Column + half helper ────────────────────────────────────────────────────
 
-function getColumnForPoint(pointIndex: number): number {
-  if (pointIndex >= 12 && pointIndex <= 17) {
-    return pointIndex - 12;
+/**
+ * Returns { col, isRight } for a given point in normal or flipped layout.
+ * isRight=true means the point sits in the right half of the board.
+ */
+function getColumnAndHalf(
+  pointIndex: number,
+  boardFlipped: boolean,
+): { col: number; isRight: boolean } {
+  if (!boardFlipped) {
+    // Normal layout
+    if (pointIndex >= 12 && pointIndex <= 17) {
+      return { col: pointIndex - 12, isRight: false };
+    }
+    if (pointIndex >= 6 && pointIndex <= 11) {
+      return { col: 11 - pointIndex, isRight: false };
+    }
+    if (pointIndex >= 18 && pointIndex <= 23) {
+      return { col: pointIndex - 18, isRight: true };
+    }
+    return { col: 5 - pointIndex, isRight: true };
   }
-  if (pointIndex >= 6 && pointIndex <= 11) {
-    return 11 - pointIndex;
-  }
+
+  // Flipped layout
+  //  Top-left:  [23][22][21][20][19][18] (col 0-5, isRight=false)
+  //  Top-right: [17][16][15][14][13][12] (col 0-5, isRight=true)
+  //  Bot-left:  [ 0][ 1][ 2][ 3][ 4][ 5](col 0-5, isRight=false)
+  //  Bot-right: [ 6][ 7][ 8][ 9][10][11](col 0-5, isRight=true)
   if (pointIndex >= 18 && pointIndex <= 23) {
-    return pointIndex - 18;
+    return { col: 23 - pointIndex, isRight: false };
   }
-  // 0-5
-  return 5 - pointIndex;
+  if (pointIndex >= 12 && pointIndex <= 17) {
+    return { col: 17 - pointIndex, isRight: true };
+  }
+  if (pointIndex >= 0 && pointIndex <= 5) {
+    return { col: pointIndex, isRight: false };
+  }
+  return { col: pointIndex - 6, isRight: true };
 }
 
 // ─── Color utilities ─────────────────────────────────────────────────────────

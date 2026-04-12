@@ -41,14 +41,17 @@ export function useCanvasResize(
         return;
       }
 
-      // Maintain 3:2 aspect ratio (landscape board)
+      // The canvas always fills the full container width so the bear-off side
+      // strips drawn in the canvas frame exactly cover the visible golden frame
+      // area — no gap between canvas edge and container background.
+      // Height is capped at the container height but we never shrink the width.
       const ASPECT = 3 / 2;
       let cssWidth = containerWidth;
-      let cssHeight = containerWidth / ASPECT;
+      let cssHeight = Math.floor(cssWidth / ASPECT);
 
       if (cssHeight > containerHeight) {
         cssHeight = containerHeight;
-        cssWidth = containerHeight * ASPECT;
+        // Intentionally NOT shrinking cssWidth here.
       }
 
       cssWidth = Math.floor(cssWidth);

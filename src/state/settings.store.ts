@@ -11,11 +11,18 @@ interface SettingsState {
   soundEnabled: boolean;
   defaultDifficulty: Difficulty;
   tutorialSeen: boolean;
+  boardFlipped: boolean;
+  autoRoll: boolean;
+  /** True once persisted settings have been loaded from IndexedDB on mount. */
+  settingsLoaded: boolean;
   setTheme: (theme: Theme) => void;
   setTextureMode: (mode: TextureMode) => void;
   setSoundEnabled: (enabled: boolean) => void;
   setDefaultDifficulty: (difficulty: Difficulty) => void;
   setTutorialSeen: (seen: boolean) => void;
+  setBoardFlipped: (flipped: boolean) => void;
+  setAutoRoll: (v: boolean) => void;
+  setSettingsLoaded: (loaded: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -24,6 +31,9 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   soundEnabled: true,
   defaultDifficulty: 'medium',
   tutorialSeen: false,
+  boardFlipped: false,
+  autoRoll: false,
+  settingsLoaded: false,
   setTheme: (theme) => {
     set({ theme });
   },
@@ -38,5 +48,14 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
   setTutorialSeen: (tutorialSeen) => {
     set({ tutorialSeen });
+  },
+  setBoardFlipped: (boardFlipped) => {
+    set({ boardFlipped });
+  },
+  setAutoRoll: (autoRoll) => {
+    set({ autoRoll });
+  },
+  setSettingsLoaded: (settingsLoaded) => {
+    set({ settingsLoaded });
   },
 }));

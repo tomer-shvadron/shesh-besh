@@ -56,6 +56,28 @@ describe('gameSave.service', () => {
       const arg = vi.mocked(db.activeGame.put).mock.calls[0]?.[0];
       expect(arg!.boardState).toEqual(state.board);
     });
+
+    it('should persist diceHistory alongside moveHistory', async () => {
+      const state = makeState({
+        moveHistory: [[{ from: 1, to: 3, dieUsed: 2 }]],
+        diceHistory: [[3, 4]],
+      });
+      await saveGame(state);
+
+      const arg = vi.mocked(db.activeGame.put).mock.calls[0]?.[0];
+      expect(arg!.diceHistory).toEqual([[3, 4]]);
+    });
+
+    it('should persist null entries in diceHistory (no-legal-moves turns)', async () => {
+      const state = makeState({
+        moveHistory: [[], [{ from: 5, to: 7, dieUsed: 2 }]],
+        diceHistory: [null, [1, 2]],
+      });
+      await saveGame(state);
+
+      const arg = vi.mocked(db.activeGame.put).mock.calls[0]?.[0];
+      expect(arg!.diceHistory).toEqual([null, [1, 2]]);
+    });
   });
 
   describe('loadGame()', () => {
@@ -74,6 +96,36 @@ describe('gameSave.service', () => {
       expect(result!.timerElapsed).toBe(12000);
       expect(result!.gameMode).toBe('pvp');
       expect(result!.difficulty).toBe('medium');
+    });
+
+    it('should restore diceHistory so move history dice are visible after reload', async () => {
+      const state = makeState({
+        moveHistory: [[{ from: 1, to: 3, dieUsed: 2 }], [{ from: 12, to: 14, dieUsed: 2 }]],
+        diceHistory: [[3, 4], [1, 6]],
+      });
+      await saveGame(state);
+
+      const result = await loadGame();
+      expect(result!.diceHistory).toEqual([[3, 4], [1, 6]]);
+    });
+
+    it('should default diceHistory to [] when missing from record (legacy saves)', async () => {
+      // Simulate a legacy record without diceHistory
+      vi.mocked(db.activeGame.get).mockResolvedValueOnce({
+        id: 'current',
+        boardState: makeState().board,
+        dice: null,
+        currentPlayer: 'white',
+        moveHistory: [[{ from: 1, to: 3, dieUsed: 2 }]],
+        // diceHistory deliberately absent
+        timerElapsed: 0,
+        difficulty: 'medium',
+        gameMode: 'pvp',
+        savedAt: new Date(),
+      });
+
+      const result = await loadGame();
+      expect(result!.diceHistory).toEqual([]);
     });
 
     it('should reset transient fields (phase to rolling, pending moves empty)', async () => {

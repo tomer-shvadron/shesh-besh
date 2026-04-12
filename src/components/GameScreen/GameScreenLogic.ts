@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useAiTurn } from '@/hooks/useAiTurn';
+import { useAutoRoll } from '@/hooks/useAutoRoll';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useSettingsPersistence } from '@/hooks/useSettingsPersistence';
 import { useTimer } from '@/hooks/useTimer';
 import { useWakeLock } from '@/hooks/useWakeLock';
@@ -30,18 +33,27 @@ export interface GameScreenLogicReturn {
 export function useGameScreenLogic(): GameScreenLogicReturn {
   const [isDesktopLayout, setIsDesktopLayout] = useState(window.innerWidth >= DESKTOP_BREAKPOINT);
   const [showNewGameDialog, setShowNewGameDialog] = useState(false);
+  const [showGameOverDialog, setShowGameOverDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHighScores, setShowHighScores] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
 
+  // Tracks whether the user explicitly dismissed the dialog while phase was still 'game-over'.
+  // Reset when phase leaves 'game-over' so the next game can show it again.
+  const gameOverDismissedRef = useRef(false);
+
   const phase = useGameStore((s) => s.phase);
   const loadState = useGameStore((s) => s.loadState);
   const tutorialSeen = useSettingsStore((s) => s.tutorialSeen);
+  const settingsLoaded = useSettingsStore((s) => s.settingsLoaded);
 
   // Activate side-effect hooks
   useAutoSave();
   useTimer();
   useWakeLock();
+  useAiTurn();
+  useKeyboardShortcuts();
+  useAutoRoll();
   useSettingsPersistence();
 
   // On mount, try to load a saved game. If none exists, open the new game dialog.
@@ -71,12 +83,28 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show tutorial automatically on first launch (after settings are loaded from DB)
+  // Show the game-over dialog when the phase transitions to 'game-over', and
+  // auto-hide it when the phase changes away (new game started). The dismissed
+  // ref prevents the dialog from reappearing while the phase is still 'game-over'
+  // after the user explicitly closes it.
   useEffect(() => {
-    if (!tutorialSeen) {
+    if (phase === 'game-over') {
+      if (!gameOverDismissedRef.current) {
+        setShowGameOverDialog(true);
+      }
+    } else {
+      gameOverDismissedRef.current = false;
+      setShowGameOverDialog(false);
+    }
+  }, [phase]);
+
+  // Show tutorial automatically on first launch — only after persisted settings have loaded
+  // from IndexedDB, to avoid opening it for users who have already completed it.
+  useEffect(() => {
+    if (settingsLoaded && !tutorialSeen) {
       setShowTutorial(true);
     }
-  }, [tutorialSeen]);
+  }, [settingsLoaded, tutorialSeen]);
 
   const handleResize = useCallback(() => {
     setIsDesktopLayout(window.innerWidth >= DESKTOP_BREAKPOINT);
@@ -114,7 +142,9 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
   }, []);
 
   const closeGameOver = useCallback((): void => {
-    // Clear the persisted save when the game-over dialog is dismissed
+    gameOverDismissedRef.current = true;
+    setShowGameOverDialog(false);
+    // Clear the persisted save so a reload starts fresh
     void clearGame();
   }, []);
 
@@ -125,8 +155,6 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
   const closeTutorial = useCallback((): void => {
     setShowTutorial(false);
   }, []);
-
-  const showGameOverDialog = phase === 'game-over';
 
   return {
     isDesktopLayout,

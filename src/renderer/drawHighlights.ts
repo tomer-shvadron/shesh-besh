@@ -1,13 +1,16 @@
-import type { BoardState, MoveTo } from '@/engine/types';
+import type { BoardState, MoveTo, Player } from '@/engine/types';
 import { getCheckerY, getPointX, isTopPoint } from '@/renderer/dimensions';
 import type { BoardDimensions } from '@/renderer/dimensions';
 import type { BoardTheme } from '@/renderer/themes/types';
 
 /**
- * Draw highlight indicators for valid move destinations.
- * - Semi-transparent filled circle for regular valid landing points
- * - Red tint for points containing an opponent blot (can be hit)
- * - Special indicator for bear-off destination ('off')
+ * Draw highlight indicators for all valid move destinations.
+ *
+ * Drawn AFTER static checkers so indicators are always visible:
+ *   - Empty point      → filled dot at where the new checker would land
+ *   - Friendly stack   → glowing ring outline around the top checker
+ *   - Opponent blot    → red/danger glowing ring around the single checker
+ *   - Bear-off ('off') → glowing dot in the bear-off tray
  */
 export function drawHighlights(
   ctx: CanvasRenderingContext2D,
@@ -15,18 +18,26 @@ export function drawHighlights(
   dims: BoardDimensions,
   theme: BoardTheme,
   boardState?: BoardState,
+  boardFlipped = false,
+  currentPlayer: Player = 'white',
+  hoveredDestination: MoveTo | null = null,
 ): void {
   for (const dest of validDestinations) {
+    const isHovered = dest === hoveredDestination;
     if (dest === 'off') {
-      drawBearOffHighlight(ctx, dims, theme);
+      drawBearOffHighlight(ctx, dims, theme, boardFlipped, currentPlayer, isHovered);
     } else {
-      const isBlotTarget = boardState ? isOpponentBlot(boardState, dest) : false;
-      drawPointHighlight(ctx, dims, theme, dest, isBlotTarget);
+      const pt = boardState?.points[dest];
+      const existingCount = pt?.count ?? 0;
+      const isHit = pt !== undefined && pt !== null && pt.player !== null
+        && pt.player !== currentPlayer
+        && pt.count === 1;
+      drawPointHighlight(ctx, dims, theme, dest, isHit, boardFlipped, existingCount, isHovered);
     }
   }
 }
 
-// ─── Individual highlight drawing ─────────────────────────────────────────────
+// ─── Per-point highlight ──────────────────────────────────────────────────────
 
 function drawPointHighlight(
   ctx: CanvasRenderingContext2D,
@@ -34,54 +45,94 @@ function drawPointHighlight(
   theme: BoardTheme,
   pointIndex: number,
   isHit: boolean,
+  boardFlipped: boolean,
+  existingCount: number,
+  isHovered = false,
 ): void {
-  const cx = getPointX(dims, pointIndex);
-  const top = isTopPoint(pointIndex);
-
-  // Place the highlight dot at the outermost checker position (where a checker would land)
-  const cy = top
-    ? dims.boardTop + dims.checkerRadius
-    : dims.boardTop + dims.boardHeight - dims.checkerRadius;
-
-  const radius = dims.checkerRadius * 0.55;
+  const cx = getPointX(dims, pointIndex, boardFlipped);
   const color = isHit ? theme.highlights.hit : theme.highlights.valid;
 
-  // Glow ring
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius * 1.5, 0, Math.PI * 2);
-  ctx.fillStyle = color.replace(/[\d.]+\)$/, (m) => {
-    // Reduce opacity for glow ring
-    const val = parseFloat(m) * 0.4;
-    return `${val.toFixed(2)})`;
-  });
-  ctx.fill();
+  if (existingCount === 0) {
+    // ── Empty point: dot at the outermost checker position ────────────────────
+    const cy = getCheckerY(dims, pointIndex, 0);
+    const radius = dims.checkerRadius * (isHovered ? 0.52 : 0.42);
+    const glowAlpha = isHovered ? Math.min(1, 0.18 * 1.8) : 0.18;
 
-  // Solid dot
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
+    // Outer glow
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 2.0, 0, Math.PI * 2);
+    ctx.fillStyle = replaceAlpha(color, glowAlpha);
+    ctx.fill();
+
+    // Solid dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  } else {
+    // ── Non-empty point: glowing ring over the top checker ────────────────────
+    // The top checker sits at the innermost visible stack position.
+    const topIdx = Math.min(existingCount - 1, 4);
+    const cy = getCheckerY(dims, pointIndex, topIdx);
+    const r = dims.checkerRadius;
+    const glowAlpha = isHovered ? Math.min(1, 0.20 * 1.8) : 0.20;
+
+    // Wide diffuse glow
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.65, 0, Math.PI * 2);
+    ctx.fillStyle = replaceAlpha(color, glowAlpha);
+    ctx.fill();
+
+    // Crisp ring outline
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.12, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, r * (isHovered ? 0.28 : 0.18));
+    ctx.stroke();
+
+    // For a blot (opponent), also draw a small warning dot at top of checker
+    if (isHit) {
+      const dotR = r * 0.22;
+      const dotY = isTopPoint(pointIndex)
+        ? cy - r * 0.62
+        : cy + r * 0.62;
+      ctx.beginPath();
+      ctx.arc(cx, dotY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
 }
+
+// ─── Bear-off highlight ───────────────────────────────────────────────────────
 
 function drawBearOffHighlight(
   ctx: CanvasRenderingContext2D,
   dims: BoardDimensions,
   theme: BoardTheme,
+  boardFlipped: boolean,
+  currentPlayer: Player,
+  isHovered = false,
 ): void {
-  // Bear-off zone is to the right of the board (in the frame area on right side)
-  // Draw a glowing indicator in both the top and bottom bear-off brackets
-  const x = dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
-
-  const radius = dims.checkerRadius * 0.45;
+  const radius = dims.checkerRadius * (isHovered ? 0.58 : 0.45);
+  const glowRadius = radius * 1.8;
   const color = theme.highlights.valid;
 
-  // Top bracket (black bear-off zone)
-  const blackY = dims.boardTop + dims.boardHeight * 0.2;
-  drawGlowDot(ctx, x, blackY, radius, color);
+  // Center vertically on the board so the dot is always fully visible
+  const cy = dims.boardTop + dims.boardHeight / 2;
 
-  // Bottom bracket (white bear-off zone)
-  const whiteY = dims.boardTop + dims.boardHeight * 0.8;
-  drawGlowDot(ctx, x, whiteY, radius, color);
+  // X position: right (or left when flipped) of the board, clamped so the glow
+  // circle never gets clipped by the canvas edge.
+  const xRaw = boardFlipped
+    ? dims.boardLeft - dims.padding * 0.5
+    : dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
+
+  const x = boardFlipped
+    ? Math.max(xRaw, glowRadius + 2)
+    : Math.min(xRaw, dims.width - glowRadius - 2);
+
+  void currentPlayer; // not needed for vertical centering
+  drawGlowDot(ctx, x, cy, radius, color);
 }
 
 function drawGlowDot(
@@ -91,36 +142,24 @@ function drawGlowDot(
   radius: number,
   color: string,
 ): void {
-  // Outer glow
   ctx.beginPath();
   ctx.arc(cx, cy, radius * 1.8, 0, Math.PI * 2);
   ctx.fillStyle = replaceAlpha(color, 0.25);
   ctx.fill();
 
-  // Inner dot
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 }
 
-// ─── Helper: check if a board point contains an opponent blot ─────────────────
-
-function isOpponentBlot(boardState: BoardState, pointIndex: number): boolean {
-  const pt = boardState.points[pointIndex];
-  if (!pt) {
-    return false;
-  }
-  return pt.player !== null && pt.count === 1;
-}
-
 // ─── Color utility ────────────────────────────────────────────────────────────
 
-/** Replace the alpha value of an rgba(...) color string. */
 function replaceAlpha(color: string, alpha: number): string {
   if (color.startsWith('rgba(')) {
     return color.replace(/[\d.]+\)$/, `${alpha})`);
   }
+  // Fallback: wrap as rgba if it's not already
   return color;
 }
 

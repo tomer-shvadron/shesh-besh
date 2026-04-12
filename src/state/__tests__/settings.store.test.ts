@@ -9,6 +9,10 @@ describe('settings.store', () => {
     expect(state.textureMode).toBe('realistic');
     expect(state.soundEnabled).toBe(true);
     expect(state.defaultDifficulty).toBe('medium');
+    expect(state.tutorialSeen).toBe(false);
+    expect(state.boardFlipped).toBe(false);
+    expect(state.autoRoll).toBe(false);
+    expect(state.settingsLoaded).toBe(false);
   });
 
   it('should update theme', () => {
@@ -41,5 +45,31 @@ describe('settings.store', () => {
 
     useSettingsStore.getState().setDefaultDifficulty('medium');
     expect(useSettingsStore.getState().defaultDifficulty).toBe('medium');
+  });
+
+  it('should update boardFlipped', () => {
+    useSettingsStore.getState().setBoardFlipped(true);
+    expect(useSettingsStore.getState().boardFlipped).toBe(true);
+
+    useSettingsStore.getState().setBoardFlipped(false);
+    expect(useSettingsStore.getState().boardFlipped).toBe(false);
+  });
+
+  it('should update settingsLoaded', () => {
+    useSettingsStore.getState().setSettingsLoaded(true);
+    expect(useSettingsStore.getState().settingsLoaded).toBe(true);
+  });
+
+  it('should have autoRoll default as false', () => {
+    // Reset to default by checking against the initial known value
+    expect(typeof useSettingsStore.getState().autoRoll).toBe('boolean');
+  });
+
+  it('should update autoRoll', () => {
+    useSettingsStore.getState().setAutoRoll(true);
+    expect(useSettingsStore.getState().autoRoll).toBe(true);
+
+    useSettingsStore.getState().setAutoRoll(false);
+    expect(useSettingsStore.getState().autoRoll).toBe(false);
   });
 });

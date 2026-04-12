@@ -27,28 +27,28 @@ export function PauseOverlay({ onNewGame, onSettings, onHighScores }: PauseOverl
           <button
             onClick={onResume}
             className="w-full rounded-lg bg-[var(--color-accent)] px-6 py-3 text-sm font-medium
-              text-white hover:bg-[var(--color-accent-hover)] transition-colors"
+              text-white hover:bg-[var(--color-accent-hover)] transition-colors cursor-pointer"
           >
             ▶ Resume
           </button>
           <button
             onClick={onNewGame}
             className="w-full rounded-lg border border-[var(--color-surface-border)] px-6 py-2.5
-              text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
           >
             🆕 New Game
           </button>
           <button
             onClick={onSettings}
             className="w-full rounded-lg border border-[var(--color-surface-border)] px-6 py-2.5
-              text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
           >
             ⚙ Settings
           </button>
           <button
             onClick={onHighScores}
             className="w-full rounded-lg border border-[var(--color-surface-border)] px-6 py-2.5
-              text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
           >
             🏆 High Scores
           </button>

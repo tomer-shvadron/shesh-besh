@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { Board } from '@/engine/board';
 import {
+  confirmOpeningRoll,
   confirmTurn,
   createInitialState,
   dismissNoMovesMessage,
   pauseGame,
   resumeGame,
+  rollAiDice,
   rollOpeningDie,
   rollTurnDice,
   selectMove,
@@ -15,7 +17,7 @@ import {
   undoTurn,
 } from '@/engine/gameController';
 import type { GameState } from '@/engine/gameController';
-import type { BoardState, Move } from '@/engine/types';
+import type { BoardState, DiceRoll, GamePhase, Move } from '@/engine/types';
 
 function makeRollingState(overrides: Partial<GameState> = {}): GameState {
   return {
@@ -60,22 +62,22 @@ describe('gameController', () => {
       expect(next.phase).toBe('opening-roll');
     });
 
-    it('should transition to moving when white rolls higher', () => {
+    it('should transition to opening-roll-done when white rolls higher', () => {
       let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
       state = rollOpeningDie(state, 'white', 5);
       state = rollOpeningDie(state, 'black', 3);
 
-      expect(state.phase).toBe('moving');
+      expect(state.phase).toBe('opening-roll-done');
       expect(state.currentPlayer).toBe('white');
       expect(state.dice).toEqual([5, 3]);
     });
 
-    it('should transition to moving with black first when black rolls higher', () => {
+    it('should transition to opening-roll-done with black first when black rolls higher', () => {
       let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
       state = rollOpeningDie(state, 'white', 2);
       state = rollOpeningDie(state, 'black', 6);
 
-      expect(state.phase).toBe('moving');
+      expect(state.phase).toBe('opening-roll-done');
       expect(state.currentPlayer).toBe('black');
       expect(state.dice).toEqual([2, 6]);
     });
@@ -88,6 +90,49 @@ describe('gameController', () => {
       expect(state.openingRolls.white).toBeNull();
       expect(state.openingRolls.black).toBeNull();
       expect(state.phase).toBe('opening-roll');
+    });
+  });
+
+  describe('confirmOpeningRoll()', () => {
+    it('should return same state if phase is not opening-roll-done', () => {
+      let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+      state = rollOpeningDie(state, 'white', 5);
+      // Only one player rolled — still opening-roll phase
+      const next = confirmOpeningRoll(state);
+      expect(next).toBe(state);
+    });
+
+    it('should transition opening-roll-done to moving in pvp mode', () => {
+      let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+      state = rollOpeningDie(state, 'white', 5);
+      state = rollOpeningDie(state, 'black', 3);
+      expect(state.phase).toBe('opening-roll-done');
+      expect(state.currentPlayer).toBe('white');
+
+      const next = confirmOpeningRoll(state);
+      expect(next.phase).toBe('moving');
+    });
+
+    it('should transition opening-roll-done to moving in pva mode when white won', () => {
+      let state = createInitialState({ gameMode: 'pva', difficulty: 'medium' });
+      state = rollOpeningDie(state, 'white', 5);
+      state = rollOpeningDie(state, 'black', 3);
+      expect(state.phase).toBe('opening-roll-done');
+      expect(state.currentPlayer).toBe('white');
+
+      const next = confirmOpeningRoll(state);
+      expect(next.phase).toBe('moving');
+    });
+
+    it('should transition opening-roll-done to ai-thinking in pva mode when black won', () => {
+      let state = createInitialState({ gameMode: 'pva', difficulty: 'medium' });
+      state = rollOpeningDie(state, 'white', 2);
+      state = rollOpeningDie(state, 'black', 6);
+      expect(state.phase).toBe('opening-roll-done');
+      expect(state.currentPlayer).toBe('black');
+
+      const next = confirmOpeningRoll(state);
+      expect(next.phase).toBe('ai-thinking');
     });
   });
 
@@ -313,6 +358,202 @@ describe('gameController', () => {
       const state = makeRollingState({ noMovesMessage: true });
       const next = dismissNoMovesMessage(state);
       expect(next.noMovesMessage).toBe(false);
+    });
+  });
+
+  describe('rollAiDice()', () => {
+    function makeAiThinkingState(overrides: Partial<GameState> = {}): GameState {
+      return {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'ai-thinking',
+        currentPlayer: 'black',
+        dice: null,
+        remainingDice: [],
+        ...overrides,
+      };
+    }
+
+    it('should return unchanged state if not in ai-thinking phase', () => {
+      const state = makeAiThinkingState({ phase: 'rolling' });
+      const next = rollAiDice(state);
+      expect(next).toBe(state);
+    });
+
+    it('should transition from ai-thinking to moving', () => {
+      const state = makeAiThinkingState();
+      const next = rollAiDice(state, [3, 5]);
+      expect(next.phase).toBe('moving');
+      expect(next.dice).toEqual([3, 5]);
+      expect(next.remainingDice).toHaveLength(2);
+    });
+
+    it('should compute legal moves after rolling', () => {
+      const state = makeAiThinkingState();
+      const next = rollAiDice(state, [1, 2]);
+      expect(Array.isArray(next.legalMovesForTurn)).toBe(true);
+    });
+
+    it('should reuse existing dice when already set (opening roll case)', () => {
+      const state = makeAiThinkingState({
+        dice: [4, 6],
+        remainingDice: [6, 4],
+      });
+      const next = rollAiDice(state); // should not re-roll
+      expect(next.phase).toBe('moving');
+      expect(next.dice).toEqual([4, 6]); // unchanged
+      expect(next.remainingDice).toEqual([6, 4]); // unchanged
+    });
+
+    it('should set noMovesMessage when no legal moves exist for AI', () => {
+      // Black has one checker but all forward points are blocked
+      const emptyPoints: BoardState['points'] = Array(24)
+        .fill(null)
+        .map(() => ({ player: null as null, count: 0 }));
+      emptyPoints[0] = { player: 'black', count: 1 };
+      for (let i = 1; i <= 6; i++) {
+        emptyPoints[i] = { player: 'white', count: 2 };
+      }
+      const board: BoardState = {
+        points: emptyPoints,
+        bar: { white: 0, black: 0 },
+        borneOff: { white: 0, black: 0 },
+      };
+      const state = makeAiThinkingState({ board });
+      const next = rollAiDice(state, [1, 2]);
+      expect(next.noMovesMessage).toBe(true);
+    });
+  });
+
+  describe('confirmTurn() — pva mode phase transitions', () => {
+    it('should set phase to ai-thinking after white confirms in pva mode', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'moving',
+        currentPlayer: 'white',
+        remainingDice: [],
+        pendingMoves: [],
+      };
+      const next = confirmTurn(state);
+      expect(next.currentPlayer).toBe('black');
+      expect(next.phase).toBe('ai-thinking');
+    });
+
+    it('should set phase to rolling after black (AI) confirms in pva mode', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'moving',
+        currentPlayer: 'black',
+        remainingDice: [],
+        pendingMoves: [],
+      };
+      const next = confirmTurn(state);
+      expect(next.currentPlayer).toBe('white');
+      expect(next.phase).toBe('rolling');
+    });
+
+    it('should set phase to rolling after white confirms in pvp mode', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pvp', difficulty: 'medium' }),
+        phase: 'moving',
+        currentPlayer: 'white',
+        remainingDice: [],
+        pendingMoves: [],
+      };
+      const next = confirmTurn(state);
+      expect(next.currentPlayer).toBe('black');
+      expect(next.phase).toBe('rolling');
+    });
+  });
+
+  describe('skipTurn() — pva mode phase transitions', () => {
+    it('should set phase to ai-thinking after white skips in pva mode', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'moving',
+        currentPlayer: 'white',
+        dice: [1, 2],
+        remainingDice: [1, 2],
+        legalMovesForTurn: [],
+        noMovesMessage: false,
+      };
+      const next = skipTurn(state);
+      expect(next.currentPlayer).toBe('black');
+      expect(next.phase).toBe('ai-thinking');
+    });
+
+    it('should set phase to rolling after black (AI) skips in pva mode', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'moving',
+        currentPlayer: 'black',
+        dice: [1, 2],
+        remainingDice: [1, 2],
+        legalMovesForTurn: [],
+        noMovesMessage: false,
+      };
+      const next = skipTurn(state);
+      expect(next.currentPlayer).toBe('white');
+      expect(next.phase).toBe('rolling');
+    });
+  });
+
+  describe('diceHistory tracking', () => {
+    it('starts empty', () => {
+      const state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+      expect(state.diceHistory).toEqual([]);
+    });
+
+    it('records dice after confirmTurn', () => {
+      let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+      state = rollTurnDice({ ...state, phase: 'rolling' }, [3, 2]);
+      state = selectMove(state, state.legalMovesForTurn[0]![0]!);
+      const stateBeforeConfirm = { ...state, pendingMoves: state.pendingMoves };
+      const confirmed = confirmTurn(stateBeforeConfirm);
+      expect(confirmed.diceHistory).toHaveLength(1);
+      expect(confirmed.diceHistory[0]).toEqual([3, 2]);
+    });
+
+    it('records null dice after skipTurn', () => {
+      let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+      // Manually put state in a skipable situation
+      state = { ...state, dice: [1, 2] as DiceRoll, phase: 'moving' as GamePhase };
+      const skipped = skipTurn(state);
+      expect(skipped.diceHistory).toHaveLength(1);
+      expect(skipped.diceHistory[0]).toEqual([1, 2]);
+    });
+
+    it('removes dice history entry after undoTurn', () => {
+      let state = createInitialState({ gameMode: 'pvp', difficulty: 'medium' });
+      state = rollTurnDice({ ...state, phase: 'rolling' }, [3, 2]);
+      state = selectMove(state, state.legalMovesForTurn[0]![0]!);
+      state = confirmTurn(state);
+      expect(state.diceHistory).toHaveLength(1);
+      const undone = undoTurn(state);
+      expect(undone.diceHistory).toHaveLength(0);
+    });
+  });
+
+  describe('resumeGame() — pva mode ai-thinking recovery', () => {
+    it('should resume to ai-thinking when AI turn was paused with no pending moves', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'paused',
+        currentPlayer: 'black',
+        pendingMoves: [],
+      };
+      const next = resumeGame(state);
+      expect(next.phase).toBe('ai-thinking');
+    });
+
+    it('should resume to rolling when human turn was paused', () => {
+      const state: GameState = {
+        ...createInitialState({ gameMode: 'pva', difficulty: 'medium' }),
+        phase: 'paused',
+        currentPlayer: 'white',
+        pendingMoves: [],
+      };
+      const next = resumeGame(state);
+      expect(next.phase).toBe('rolling');
     });
   });
 });
