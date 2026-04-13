@@ -1,19 +1,30 @@
 #!/usr/bin/env node
 /**
- * Lighthouse performance baseline.
+ * Lighthouse — local-only convenience script.
  *
- * Runs Lighthouse (headless Chrome) against the `pnpm preview` server and
- * prints the key Core Web Vital scores:
+ * For CI gating use Lighthouse CI (`@lhci/cli`) via lighthouserc.json — that
+ * is what runs in the GitHub Actions workflow. This script is for ad-hoc
+ * developer runs against `pnpm preview` when you want a quick interactive
+ * report without spinning up the LHCI tooling.
  *
- *   Performance / Accessibility / Best-Practices / SEO / PWA (0–100)
- *   LCP, CLS, TBT, INP, FCP                          (values)
- *   Main JS bundle size                              (kB gzip)
+ * Reports:
+ *   Performance / Accessibility / Best-Practices / SEO    (0–100)
+ *   LCP, CLS, TBT, FCP, Speed Index                       (lab values)
+ *
+ * Note: INP is *not* a lab metric — Lighthouse cannot measure it reliably
+ * because it requires real user interactions across a full session. INP is
+ * captured client-side via the `web-vitals` library (see
+ * `src/services/webVitals.service.ts`) and reported in production / dev
+ * via the browser console. Do not look for an INP number here.
+ *
+ * The PWA category was removed in Lighthouse 12 (May 2024); this script
+ * does not request it.
  *
  * Usage:
  *   pnpm preview &                              # start the preview server
- *   node scripts/lighthouse.mjs                 # audit http://localhost:4173
- *   node scripts/lighthouse.mjs --url http://localhost:5173
- *   node scripts/lighthouse.mjs --mobile        # emulate Moto G Power (mobile)
+ *   node scripts/lighthouse.mjs                 # audit http://localhost:4173/shesh-besh/
+ *   node scripts/lighthouse.mjs --url=http://localhost:5173/shesh-besh/
+ *   node scripts/lighthouse.mjs --mobile        # emulate Moto G Power
  *
  * Requires `lighthouse` and `chrome-launcher` to be installed:
  *   pnpm add -D lighthouse chrome-launcher
@@ -30,7 +41,7 @@ import process from 'node:process';
 
 const args = process.argv.slice(2);
 const urlArg = args.find((a) => a.startsWith('--url='));
-const url = urlArg ? urlArg.slice('--url='.length) : 'http://localhost:4173';
+const url = urlArg ? urlArg.slice('--url='.length) : 'http://localhost:4173/shesh-besh/';
 const isMobile = args.includes('--mobile');
 const performanceThreshold = isMobile ? 0.85 : 0.95;
 
@@ -53,7 +64,8 @@ try {
   const options = {
     logLevel: 'error',
     output: 'json',
-    onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo', 'pwa'],
+    // PWA was removed in Lighthouse 12 (May 2024) — omit it from the request.
+    onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
     port: chrome.port,
     formFactor: isMobile ? 'mobile' : 'desktop',
     screenEmulation: isMobile
@@ -77,9 +89,6 @@ try {
   process.stdout.write(`  Accessibility     ${fmt(cats.accessibility?.score)}\n`);
   process.stdout.write(`  Best practices    ${fmt(cats['best-practices']?.score)}\n`);
   process.stdout.write(`  SEO               ${fmt(cats.seo?.score)}\n`);
-  if (cats.pwa) {
-    process.stdout.write(`  PWA               ${fmt(cats.pwa.score)}\n`);
-  }
   process.stdout.write('\n');
 
   const metric = (id) => lhr.audits[id]?.displayValue ?? '-';

@@ -6,6 +6,7 @@ import {
   confirmTurn,
   createInitialState,
   dismissNoMovesMessage,
+  isTurnComplete,
   pauseGame,
   resumeGame,
   rollAiDice,
@@ -554,6 +555,39 @@ describe('gameController', () => {
       };
       const next = resumeGame(state);
       expect(next.phase).toBe('rolling');
+    });
+  });
+
+  describe('isTurnComplete()', () => {
+    it('returns false when phase is not moving', () => {
+      expect(isTurnComplete(makeRollingState())).toBe(false);
+    });
+
+    it('returns true when no dice remain', () => {
+      const state = makeRollingState({
+        phase: 'moving',
+        remainingDice: [],
+        legalMovesForTurn: [[{ from: 1, to: 2, dieUsed: 1 }]],
+      });
+      expect(isTurnComplete(state)).toBe(true);
+    });
+
+    it('returns true when no legal moves remain for the remaining dice', () => {
+      const state = makeRollingState({
+        phase: 'moving',
+        remainingDice: [3, 5],
+        legalMovesForTurn: [],
+      });
+      expect(isTurnComplete(state)).toBe(true);
+    });
+
+    it('returns false when dice remain and at least one legal move exists', () => {
+      const state = makeRollingState({
+        phase: 'moving',
+        remainingDice: [3],
+        legalMovesForTurn: [[{ from: 23, to: 20, dieUsed: 3 }]],
+      });
+      expect(isTurnComplete(state)).toBe(false);
     });
   });
 });

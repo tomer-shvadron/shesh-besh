@@ -6,6 +6,7 @@ import {
   confirmTurn,
   createInitialState,
   dismissNoMovesMessage,
+  isTurnComplete,
   pauseGame,
   resumeGame,
   rollAiDice,
@@ -142,11 +143,32 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const move = { from, to, dieUsed };
     const next = selectMove(state, move);
 
-    // Always set the intermediate state so the animation effect can fire this render cycle.
+    // Always set the intermediate state first so BoardCanvasLogic's
+    // pendingMoves effect can fire this render cycle and kick off the
+    // checker-slide animation.
     set({ ...next, selectedPoint: null, validDestinations: [] });
 
-    // Defer auto-confirm to the next task so animations have time to start.
-    if (next.remainingDice.length === 0 || next.legalMovesForTurn.length === 0) {
+    // Auto-advance past the "Confirm" step when the turn is complete (dice
+    // exhausted, or no legal moves remain for the remaining dice).
+    //
+    // IMPORTANT: the deferral here is *load-bearing*, not a code smell.
+    //  - set() schedules a React render.
+    //  - We need React to actually render with the intermediate state
+    //    (pendingMoves populated, dice consumed) so the useEffect in
+    //    BoardCanvasLogic that diff-watches pendingMoves fires and starts
+    //    the checker animation.
+    //  - Only after that render may we call confirmTurn, which would
+    //    otherwise collapse into a single batched render alongside
+    //    selectMove — skipping the animation entirely.
+    //  - setTimeout(…, 0) yields to the event loop *after* microtasks (so
+    //    React flushes the render + effects); queueMicrotask would run
+    //    BEFORE the render and lose the effect. This is not
+    //    interchangeable.
+    //
+    // The predicate itself lives in the engine as `isTurnComplete`, so
+    // the decision is pure and unit-testable; only the scheduling stays
+    // here.
+    if (isTurnComplete(next)) {
       setTimeout(() => {
         const current = get();
         if (current.phase === 'moving') {

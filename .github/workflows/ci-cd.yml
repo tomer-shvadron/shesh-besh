@@ -14,16 +14,15 @@ jobs:
       - uses: pnpm/action-setup@v5
         with:
           version: 10
+      # setup-node with cache: 'pnpm' transparently caches the pnpm store
+      # (keyed on pnpm-lock.yaml). A separate actions/cache step is redundant
+      # and — because pnpm 10 stores at ~/.local/share/pnpm/store, not
+      # ~/.pnpm-store — the old manual step silently failed to save the cache
+      # on every run.
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: 'pnpm'
-      - name: Cache pnpm store
-        uses: actions/cache@v5
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
 
@@ -38,12 +37,6 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - name: Cache pnpm store
-        uses: actions/cache@v5
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
@@ -58,12 +51,6 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - name: Cache pnpm store
-        uses: actions/cache@v5
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
       - uses: actions/upload-artifact@v7
@@ -82,12 +69,6 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-      - name: Cache pnpm store
-        uses: actions/cache@v5
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-store-${{ runner.os }}-
       - run: pnpm install --frozen-lockfile
 
       # Cache Playwright browser binaries — key on lockfile so it only misses
@@ -116,7 +97,7 @@ jobs:
       - name: Listener audit
         run: pnpm audit:listeners
 
-      # Upload dist so the deploy job can reuse it without rebuilding.
+      # Upload dist so the deploy and lighthouse jobs can reuse it.
       - name: Upload dist artifact
         uses: actions/upload-artifact@v7
         with:
@@ -131,8 +112,45 @@ jobs:
           name: playwright-report
           path: playwright-report/
 
+  lighthouse:
+    needs: e2e-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      # Reuse the already-built dist from e2e-test — no rebuild.
+      - name: Download dist artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      # Use Google's official Lighthouse CI (LHCI) via the treosh wrapper.
+      # LHCI starts its own static server (configured in lighthouserc.json),
+      # runs Lighthouse 3× on the root URL, asserts against the thresholds
+      # in lighthouserc.json, and uploads the HTML report as a temporary
+      # public link that gets commented on the PR.
+      #
+      # Note: we audit lab metrics (Performance, Accessibility, LCP, CLS,
+      # TBT). INP is a field-only metric — measured client-side by the
+      # web-vitals library, not here.
+      - name: Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
   deploy:
-    needs: [lint, typecheck, unit-test, e2e-test]
+    needs: [lint, typecheck, unit-test, e2e-test, lighthouse]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -145,7 +163,7 @@ jobs:
     steps:
       # Download the dist artifact built (and tested) by e2e-test — no rebuild needed.
       - name: Download dist artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: dist-${{ github.sha }}
           path: dist/

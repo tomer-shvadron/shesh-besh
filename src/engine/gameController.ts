@@ -223,6 +223,19 @@ export function undoLastMove(state: GameState): GameState {
 }
 
 /**
+ * True when the current `moving` turn has no more work to do:
+ * either every die has been consumed, or no legal moves remain for the
+ * dice that are left. Caller (store / UI) uses this to decide whether
+ * to auto-advance past the "Confirm" UI step.
+ */
+export function isTurnComplete(state: GameState): boolean {
+  if (state.phase !== 'moving') {
+    return false;
+  }
+  return state.remainingDice.length === 0 || state.legalMovesForTurn.length === 0;
+}
+
+/**
  * Confirm the current turn: commit all pending moves to the board, switch player.
  */
 export function confirmTurn(state: GameState): GameState {
