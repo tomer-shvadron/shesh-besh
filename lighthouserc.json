@@ -1,8 +1,9 @@
 {
   "ci": {
     "collect": {
-      "staticDistDir": "./dist",
-      "url": ["http://localhost/shesh-besh/index.html"],
+      "startServerCommand": "pnpm preview --port 4173 --strictPort",
+      "startServerReadyPattern": "Local:",
+      "url": ["http://localhost:4173/shesh-besh/"],
       "numberOfRuns": 3,
       "settings": {
         "preset": "desktop",
