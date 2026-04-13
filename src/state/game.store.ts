@@ -18,9 +18,10 @@ import {
 } from '@/engine/gameController';
 import type { GameState } from '@/engine/gameController';
 import { getValidDestinations } from '@/engine/moveValidator';
-import type { Difficulty, DiceRoll, DiceValue, GameMode, Move, MoveFrom, MoveTo, Player } from '@/engine/types';
+import type { Difficulty, DiceValue, GameMode, Move, MoveFrom, MoveTo, Player } from '@/engine/types';
+import { clearAllAnimations } from '@/renderer/animationState';
 
-interface GameStoreState extends GameState {
+export interface GameStoreState extends GameState {
   // UI-only state
   selectedPoint: MoveFrom | null;
   validDestinations: MoveTo[];
@@ -67,6 +68,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   // ── Game lifecycle ───────────────────────────────────────────────────────────
   initGame: (mode, difficulty) => {
+    // Cancel any in-flight animations from the previous game. Without this,
+    // leftover dice-roll or checker-move animations would continue drawing over
+    // the new board until they finish on their own timeline.
+    clearAllAnimations();
+
     // Auto-perform the opening roll (each player rolls one die; higher goes first).
     // Keep re-rolling until there is no tie, then transition straight to 'moving'.
     let state = createInitialState({ gameMode: mode, difficulty });
@@ -202,6 +208,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   // ── Pause / Resume ───────────────────────────────────────────────────────────
   handlePause: () => {
+    // Stop any mid-flight animations so they don't "resume" into the future.
+    clearAllAnimations();
+
     const state = get();
     const next = pauseGame(state);
     set(next);
@@ -228,9 +237,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   // ── Load persisted game state ─────────────────────────────────────────────────
   loadState: (state: GameState) => {
+    // Cancel any in-flight animations — the restored state has its own view of
+    // the world and older animations would no longer correspond to it.
+    clearAllAnimations();
+
     set({
       ...state,
-      diceHistory: (state as GameState & { diceHistory?: (DiceRoll | null)[] }).diceHistory ?? [],
+      diceHistory: state.diceHistory ?? [],
       selectedPoint: null,
       validDestinations: [],
     });

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import type { DiceRoll, Move, MoveFrom, MoveTo } from '@/engine/types';
 import { useGameStore } from '@/state/game.store';
 
@@ -46,6 +48,7 @@ function moveToSegment(move: Move): MoveSegment {
 export interface MoveHistoryLogicReturn {
   entries: MoveEntry[];
   currentTurn: number;
+  listRef: React.RefObject<HTMLUListElement | null>;
 }
 
 export function useMoveHistoryLogic(): MoveHistoryLogicReturn {
@@ -71,8 +74,18 @@ export function useMoveHistoryLogic(): MoveHistoryLogicReturn {
     };
   });
 
+  // Auto-scroll the list to the bottom whenever a new turn is appended, so the
+  // most recent move stays visible without the user having to scroll manually.
+  const listRef = useRef<HTMLUListElement | null>(null);
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [entries.length]);
+
   return {
     entries,
     currentTurn: moveHistory.length,
+    listRef,
   };
 }

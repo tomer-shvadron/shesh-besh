@@ -1,5 +1,3 @@
-import { useEffect, useRef } from 'react';
-
 import { useMoveHistoryLogic } from '@/components/MoveHistory/MoveHistoryLogic';
 import type { ClusteredSegment, MoveEntry } from '@/components/MoveHistory/MoveHistoryLogic';
 import type { DiceRoll } from '@/engine/types';
@@ -189,14 +187,7 @@ function TurnRow({ entry, isCurrentTurn }: { entry: MoveEntry; isCurrentTurn: bo
 }
 
 export function MoveHistory(): React.JSX.Element {
-  const { entries, currentTurn } = useMoveHistoryLogic();
-  const listRef = useRef<HTMLUListElement | null>(null);
-
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [entries.length]);
+  const { entries, currentTurn, listRef } = useMoveHistoryLogic();
 
   return (
     <div className="flex flex-col h-full">

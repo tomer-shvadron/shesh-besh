@@ -21,10 +21,17 @@ import type { BoardDimensions } from '@/renderer/dimensions';
 export function useCanvasResize(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   containerRef: React.RefObject<HTMLDivElement | null>,
+  onResize?: () => void,
 ): React.RefObject<BoardDimensions | null> {
   const dimsRef = useRef<BoardDimensions | null>(null);
   // Track last applied size to skip no-op resize events
   const lastCssSizeRef = useRef<{ w: number; h: number } | null>(null);
+
+  // Keep the latest callback in a ref so the observer doesn't re-bind on every render.
+  const onResizeRef = useRef(onResize);
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  });
 
   useEffect(() => {
     const applyResize = (): void => {
@@ -81,6 +88,7 @@ export function useCanvasResize(
       }
 
       dimsRef.current = computeBoardDimensions(cssWidth, cssHeight);
+      onResizeRef.current?.();
     };
 
     // Initial measurement
