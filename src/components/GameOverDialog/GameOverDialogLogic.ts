@@ -1,4 +1,5 @@
 import { useGameStore } from '@/state/game.store';
+import { checkersRemaining } from '@/utils/bearOff';
 
 export interface GameOverDialogLogicReturn {
   winnerLabel: string;
@@ -54,8 +55,7 @@ export function useGameOverDialogLogic(): GameOverDialogLogicReturn {
 
   // Margin = checkers the loser has remaining (not borne off)
   const loserPlayer = winner === 'white' ? 'black' : 'white';
-  const loserBorneOff = board.borneOff[loserPlayer];
-  const margin = Math.max(0, 15 - loserBorneOff);
+  const margin = checkersRemaining(board.borneOff[loserPlayer]);
 
   const score = winner !== null ? calcScore(timerElapsed, difficulty, margin) : 0;
 

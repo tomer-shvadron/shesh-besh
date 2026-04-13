@@ -5,6 +5,7 @@ import { makeLinearGradient, withSavedCtx } from '@/renderer/canvasUtils';
 import { getCheckerY, getPointX, isTopPoint } from '@/renderer/dimensions';
 import type { BoardDimensions } from '@/renderer/dimensions';
 import type { BoardTheme } from '@/renderer/themes/types';
+import { bearOffFillRatio } from '@/utils/bearOff';
 import { getBearOffXRaw } from '@/utils/boardCoordinates';
 
 const MAX_VISIBLE_STACK = 5;
@@ -204,7 +205,7 @@ function drawBearOffProgressBar(
 
       const topY = isTop ? dims.boardTop + margin : dims.boardTop + halfH + margin;
       const left = cx - barW / 2;
-      const fillH = (count / 15) * barH;
+      const fillH = bearOffFillRatio(count) * barH;
 
       // Track (empty background)
       withSavedCtx(ctx, () => {

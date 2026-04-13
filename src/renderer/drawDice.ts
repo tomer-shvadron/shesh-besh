@@ -1,5 +1,6 @@
 import type { DiceValue } from '@/engine/types';
 import type { BoardTheme } from '@/renderer/themes/types';
+import { DICE_FACES } from '@/utils/dicePatterns';
 
 export interface DiceDisplayState {
   values: DiceValue[];   // current remaining dice values
@@ -101,20 +102,6 @@ export function drawSingleDie(
 
 // ─── Pip layout ────────────────────────────────────────────────────────────────
 
-/**
- * Standard pip positions for each die face.
- * Coordinates are relative to die center in the range [-0.5, 0.5] × [-0.5, 0.5].
- * Multiplied by (size * 0.58) to get actual offsets.
- */
-const PIP_POSITIONS: Record<DiceValue, [number, number][]> = {
-  1: [[0, 0]],
-  2: [[-0.28, -0.28], [0.28, 0.28]],
-  3: [[-0.28, -0.28], [0, 0], [0.28, 0.28]],
-  4: [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28]],
-  5: [[-0.28, -0.28], [0.28, -0.28], [0, 0], [-0.28, 0.28], [0.28, 0.28]],
-  6: [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0], [0.28, 0], [-0.28, 0.28], [0.28, 0.28]],
-};
-
 function drawPips(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -123,13 +110,15 @@ function drawPips(
   value: DiceValue,
   pipColor: string,
 ): void {
-  const positions = PIP_POSITIONS[value];
-  const scale = size * 0.58;
+  const positions = DICE_FACES[value];
+  // Previous magic number: 0.28 × (size × 0.58). Keep the same on-screen
+  // result by combining them into a single per-unit scale.
+  const scale = size * 0.28 * 0.58;
   const pipRadius = Math.max(1.5, size * 0.08);
 
-  for (const [dx, dy] of positions) {
-    const px = cx + dx * scale;
-    const py = cy + dy * scale;
+  for (const [fx, fy] of positions) {
+    const px = cx + fx * scale;
+    const py = cy + fy * scale;
 
     // Pip shadow
     ctx.beginPath();

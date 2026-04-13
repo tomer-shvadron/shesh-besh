@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAiTurn } from '@/hooks/useAiTurn';
+import { useAutoPauseOnHidden } from '@/hooks/useAutoPauseOnHidden';
 import { useAutoRoll } from '@/hooks/useAutoRoll';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -55,6 +56,7 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
   useKeyboardShortcuts();
   useAutoRoll();
   useSettingsPersistence();
+  useAutoPauseOnHidden();
 
   // On mount, try to load a saved game. If none exists, open the new game dialog.
   useEffect(() => {

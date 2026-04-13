@@ -1,42 +1,8 @@
 import { useMoveHistoryLogic } from '@/components/MoveHistory/MoveHistoryLogic';
 import type { ClusteredSegment, MoveEntry } from '@/components/MoveHistory/MoveHistoryLogic';
-import type { DiceRoll } from '@/engine/types';
+import type { DiceRoll, DiceValue } from '@/engine/types';
 import { useSettingsStore } from '@/state/settings.store';
-
-// Pip patterns for die faces (positions as [x,y] fractions of die size, 0=center)
-const DICE_FACES: Record<number, [number, number][]> = {
-  1: [[0, 0]],
-  2: [
-    [-1, -1],
-    [1, 1],
-  ],
-  3: [
-    [-1, -1],
-    [0, 0],
-    [1, 1],
-  ],
-  4: [
-    [-1, -1],
-    [1, -1],
-    [-1, 1],
-    [1, 1],
-  ],
-  5: [
-    [-1, -1],
-    [1, -1],
-    [0, 0],
-    [-1, 1],
-    [1, 1],
-  ],
-  6: [
-    [-1, -1],
-    [1, -1],
-    [-1, 0],
-    [1, 0],
-    [-1, 1],
-    [1, 1],
-  ],
-};
+import { DICE_FACES } from '@/utils/dicePatterns';
 
 interface MiniDieProps {
   value: number;
@@ -51,7 +17,7 @@ function MiniDie({ value, dieBg, diePip, borderColor }: MiniDieProps): React.JSX
   const inner = size - pad * 2;
   const r = 3;
   const pipR = 2;
-  const pips = DICE_FACES[value] ?? [];
+  const pips = DICE_FACES[value as DiceValue] ?? [];
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
