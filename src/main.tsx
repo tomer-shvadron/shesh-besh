@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from '@/App';
+import { saveGame } from '@/services/gameSave.service';
 import { useGameStore } from '@/state/game.store';
 
 import '@/styles/index.css';
@@ -12,10 +13,10 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
-// Expose game store for E2E tests
-if (import.meta.env.MODE !== 'production') {
-  (window as unknown as Record<string, unknown>).__GAME_STORE__ = useGameStore;
-}
+// Expose helpers for E2E tests (safe for a game app — no sensitive data)
+const win = window as unknown as Record<string, unknown>;
+win.__GAME_STORE__ = useGameStore;
+win.__SAVE_GAME__ = saveGame;
 
 createRoot(rootElement).render(
   <StrictMode>

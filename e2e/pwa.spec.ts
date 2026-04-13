@@ -28,23 +28,25 @@ test.describe('PWA Features', () => {
   });
 
   test('service worker registers', async ({ page }) => {
-    // Wait for service worker to be active
-    const swController = await page
-      .waitForFunction(
-        () => navigator.serviceWorker?.controller !== null && navigator.serviceWorker?.controller !== undefined,
-        { timeout: 15000 },
-      )
-      .catch(() => null);
-    // If the SW didn't become controller in time, at least verify registration was attempted
-    if (!swController) {
-      const swRegistered = await page.evaluate(async () => {
-        const reg = await navigator.serviceWorker?.getRegistration();
-        return reg !== undefined;
-      });
-      expect(swRegistered).toBe(true);
-    } else {
-      expect(swController).toBeTruthy();
-    }
+    // The PWA uses registerType: 'autoUpdate', which may trigger a page reload when a new
+    // SW installs. Wait for any in-flight reload to settle before checking SW state.
+    await page.waitForLoadState('networkidle');
+
+    // Check SW registration — either already controlling or at least installed/waiting.
+    const swState = await page.evaluate(async () => {
+      // Fast path: SW already controlling this page
+      if (navigator.serviceWorker?.controller) {
+        return 'controlling';
+      }
+      // Slow path: SW installed or waiting (first visit after a new build)
+      const reg = await navigator.serviceWorker?.getRegistration();
+      if (reg?.active ?? reg?.installing ?? reg?.waiting) {
+        return 'registered';
+      }
+      return 'none';
+    });
+
+    expect(swState).not.toBe('none');
   });
 
   test('app works offline', async ({ page, context }) => {

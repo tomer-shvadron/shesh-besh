@@ -161,10 +161,10 @@ test.describe('Move History — dice display', () => {
     // Inject a completed turn with known dice into the store AND save it to IndexedDB.
     // This simulates the auto-save that happens during normal gameplay.
     await page.evaluate(async () => {
-      const store = (window as unknown as Record<string, unknown>).__GAME_STORE__ as {
+      const win = window as unknown as Record<string, unknown>;
+      const store = win.__GAME_STORE__ as {
         getState: () => {
           loadState: (s: object) => void;
-          saveGame?: () => Promise<void>;
         };
       };
       if (!store) { throw new Error('__GAME_STORE__ not exposed'); }
@@ -181,16 +181,10 @@ test.describe('Move History — dice display', () => {
         diceHistory: [[5, 6]],
       });
 
-      // Trigger the auto-save so IndexedDB has the updated state with diceHistory
-      const saveGameFn = store.getState().saveGame;
-      if (saveGameFn) {
-        await saveGameFn();
-      } else {
-        // Fallback: write directly via the service
-        const { saveGame } = await import('/src/services/gameSave.service.ts');
-        const state = store.getState() as Parameters<typeof saveGame>[0];
-        await saveGame(state);
-      }
+      // Persist state to IndexedDB using the exposed saveGame helper
+      const saveGameFn = win.__SAVE_GAME__ as ((state: object) => Promise<void>) | undefined;
+      if (!saveGameFn) { throw new Error('__SAVE_GAME__ not exposed'); }
+      await saveGameFn(store.getState() as object);
     });
 
     // Reload the page — the game should be restored from IndexedDB

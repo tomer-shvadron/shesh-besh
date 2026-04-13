@@ -725,7 +725,7 @@ export function useBoardCanvasLogic(): BoardCanvasLogicReturn {
 function drawSourceHoverHighlight(
   ctx: CanvasRenderingContext2D,
   dims: BoardDimensions,
-  theme: BoardTheme,
+  _theme: BoardTheme,
   point: MoveFrom,
   displayBoard: BoardState,
   flipped: boolean,

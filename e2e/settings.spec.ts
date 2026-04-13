@@ -32,7 +32,7 @@ test.describe('Settings Panel', () => {
     await expect(panel.getByRole('button', { name: /realistic/i })).toBeVisible();
     await expect(panel.getByRole('button', { name: /classic/i })).toBeVisible();
     // Sound toggle
-    await expect(panel.getByRole('switch')).toBeVisible();
+    await expect(panel.getByRole('switch', { name: /sound effects/i })).toBeVisible();
     await expect(panel.getByText('Sound Effects')).toBeVisible();
     // Difficulty selector
     await expect(panel.getByRole('button', { name: /^easy$/i })).toBeVisible();
@@ -69,7 +69,7 @@ test.describe('Settings Panel', () => {
 
   test('sound toggle works', async ({ page }) => {
     await openSettings(page);
-    const soundToggle = page.getByRole('switch');
+    const soundToggle = page.getByRole('switch', { name: /sound effects/i });
     // Check initial state
     const initialChecked = await soundToggle.getAttribute('aria-checked');
     // Toggle off
