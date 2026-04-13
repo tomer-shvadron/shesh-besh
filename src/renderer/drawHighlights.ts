@@ -2,6 +2,7 @@ import type { BoardState, MoveTo, Player } from '@/engine/types';
 import { getCheckerY, getPointX, isTopPoint } from '@/renderer/dimensions';
 import type { BoardDimensions } from '@/renderer/dimensions';
 import type { BoardTheme } from '@/renderer/themes/types';
+import { clampBearOffX, getBearOffCenterY, getBearOffXRaw } from '@/utils/boardCoordinates';
 
 /**
  * Draw highlight indicators for all valid move destinations.
@@ -118,18 +119,8 @@ function drawBearOffHighlight(
   const glowRadius = radius * 1.8;
   const color = theme.highlights.valid;
 
-  // Center vertically on the board so the dot is always fully visible
-  const cy = dims.boardTop + dims.boardHeight / 2;
-
-  // X position: right (or left when flipped) of the board, clamped so the glow
-  // circle never gets clipped by the canvas edge.
-  const xRaw = boardFlipped
-    ? dims.boardLeft - dims.padding * 0.5
-    : dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
-
-  const x = boardFlipped
-    ? Math.max(xRaw, glowRadius + 2)
-    : Math.min(xRaw, dims.width - glowRadius - 2);
+  const cy = getBearOffCenterY(dims);
+  const x = clampBearOffX(getBearOffXRaw(dims, boardFlipped), dims, glowRadius, boardFlipped);
 
   void currentPlayer; // not needed for vertical centering
   drawGlowDot(ctx, x, cy, radius, color);

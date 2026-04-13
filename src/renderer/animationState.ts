@@ -6,6 +6,7 @@
 import type { DiceValue, MoveFrom, MoveTo, Player } from '@/engine/types';
 import type { BoardDimensions } from '@/renderer/dimensions';
 import { getCheckerY, getPointX, isTopPoint } from '@/renderer/dimensions';
+import { clampBearOffX, getBearOffCenterY, getBearOffXRaw } from '@/utils/boardCoordinates';
 
 export type AnimationType = 'checker-move' | 'checker-hit' | 'dice-roll' | 'win';
 
@@ -105,14 +106,9 @@ function toCoords(
   if (to === 'off') {
     // Land exactly on the bear-off highlight dot (vertically centered, x clamped to canvas).
     // Must match the position computed in drawBearOffHighlight in drawHighlights.ts.
-    const xRaw = boardFlipped
-      ? dims.boardLeft - dims.padding * 0.5
-      : dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
     const glowR = dims.checkerRadius * 0.81; // 0.45 (base radius) × 1.8 (glow multiplier)
-    const x = boardFlipped
-      ? Math.max(xRaw, glowR + 2)
-      : Math.min(xRaw, dims.width - glowR - 2);
-    const y = dims.boardTop + dims.boardHeight / 2;
+    const x = clampBearOffX(getBearOffXRaw(dims, boardFlipped), dims, glowR, boardFlipped);
+    const y = getBearOffCenterY(dims);
     void player; // player isn't used for y-position (centered for both)
     return { x, y };
   }
@@ -221,6 +217,14 @@ export function clearWinCelebration(): void {
 }
 
 // ── Stack animations ───────────────────────────────────────────────────────────
+
+/**
+ * Look up the in-flight stack animation for a given point (or the bar), if any.
+ * Used by the checker drawer to scale/settle the stack top during push/pop.
+ */
+export function getStackAnimation(point: number | 'bar'): StackAnimation | undefined {
+  return animState.stackAnimations.find((a) => a.point === point);
+}
 
 /**
  * Animate the remaining stack when a checker leaves (it "settles" inward, scale 0.82→1).

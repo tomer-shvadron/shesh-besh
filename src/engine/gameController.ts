@@ -95,6 +95,22 @@ export function rollOpeningDie(state: GameState, player: Player, forcedValue?: D
 }
 
 /**
+ * Keep rolling opening dice for both players until the tie resolves, up to
+ * `maxAttempts` rounds. Returns the final state; if all attempts still tie the
+ * state stays in `opening-roll` and can be rolled again later.
+ */
+export function rollOpeningUntilDecided(state: GameState, maxAttempts = 20): GameState {
+  let current = state;
+  let attempts = 0;
+  while (current.phase === 'opening-roll' && attempts < maxAttempts) {
+    current = rollOpeningDie(current, 'white');
+    current = rollOpeningDie(current, 'black');
+    attempts++;
+  }
+  return current;
+}
+
+/**
  * Confirm the opening roll result and begin the first turn.
  * Transitions from 'opening-roll-done' to 'moving' (or 'ai-thinking' if AI goes first in pva mode).
  */

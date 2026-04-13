@@ -10,6 +10,7 @@ import {
   resumeGame,
   rollAiDice,
   rollOpeningDie,
+  rollOpeningUntilDecided,
   rollTurnDice,
   selectMove,
   skipTurn,
@@ -75,13 +76,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     // Auto-perform the opening roll (each player rolls one die; higher goes first).
     // Keep re-rolling until there is no tie, then transition straight to 'moving'.
-    let state = createInitialState({ gameMode: mode, difficulty });
-    let attempts = 0;
-    while (state.phase === 'opening-roll' && attempts < 20) {
-      state = rollOpeningDie(state, 'white');
-      state = rollOpeningDie(state, 'black');
-      attempts++;
-    }
+    const state = rollOpeningUntilDecided(createInitialState({ gameMode: mode, difficulty }));
 
     set({
       ...state,

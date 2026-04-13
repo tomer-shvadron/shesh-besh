@@ -30,6 +30,21 @@ export function useWakeLock(): void {
     }
 
     let cancelled = false;
+    let activeSentinel: WakeLockSentinel | null = null;
+    let releaseHandler: (() => void) | null = null;
+
+    const handleRelease = (): void => {
+      if (!cancelled && ACTIVE_PHASES.has(useGameStore.getState().phase)) {
+        void navigator.wakeLock.request('screen').then((s) => {
+          if (cancelled) {
+            void s.release().catch(() => undefined);
+          } else {
+            lockRef.current = s;
+            activeSentinel = s;
+          }
+        }).catch(() => undefined);
+      }
+    };
 
     navigator.wakeLock
       .request('screen')
@@ -39,28 +54,27 @@ export function useWakeLock(): void {
           return;
         }
         lockRef.current = sentinel;
+        activeSentinel = sentinel;
 
         // Re-acquire if the lock is released by the system (e.g. tab hidden)
-        sentinel.addEventListener('release', () => {
-          if (!cancelled && ACTIVE_PHASES.has(useGameStore.getState().phase)) {
-            void navigator.wakeLock.request('screen').then((s) => {
-              if (cancelled) {
-                void s.release().catch(() => undefined);
-              } else {
-                lockRef.current = s;
-              }
-            }).catch(() => undefined);
-          }
-        });
+        releaseHandler = handleRelease;
+        sentinel.addEventListener('release', releaseHandler);
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
+      // Explicitly remove the release listener before dropping the sentinel
+      // reference so there is no chance of it firing after unmount.
+      if (activeSentinel && releaseHandler) {
+        activeSentinel.removeEventListener('release', releaseHandler);
+      }
       if (lockRef.current) {
         void lockRef.current.release().catch(() => undefined);
         lockRef.current = null;
       }
+      activeSentinel = null;
+      releaseHandler = null;
     };
   }, [isActive]);
 }

@@ -1,9 +1,11 @@
 import type { BoardState, MoveFrom, Player } from '@/engine/types';
-import { animState } from '@/renderer/animationState';
+import { getStackAnimation } from '@/renderer/animationState';
 import type { StackAnimation } from '@/renderer/animationState';
+import { makeLinearGradient, withSavedCtx } from '@/renderer/canvasUtils';
 import { getCheckerY, getPointX, isTopPoint } from '@/renderer/dimensions';
 import type { BoardDimensions } from '@/renderer/dimensions';
 import type { BoardTheme } from '@/renderer/themes/types';
+import { getBearOffXRaw } from '@/utils/boardCoordinates';
 
 const MAX_VISIBLE_STACK = 5;
 
@@ -60,7 +62,7 @@ function drawPointCheckers(
   const visibleCount = Math.min(count, MAX_VISIBLE_STACK);
 
   // Look up any active stack animation for this point
-  const stackAnim = animState.stackAnimations.find((a) => a.point === pointIndex);
+  const stackAnim = getStackAnimation(pointIndex);
 
   for (let i = 0; i < visibleCount; i++) {
     const cy = getCheckerY(dims, pointIndex, i);
@@ -70,12 +72,12 @@ function drawPointCheckers(
 
     if (isTop && stackAnim) {
       const scale = stackAnimScale(stackAnim);
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.scale(scale, scale);
-      ctx.translate(-cx, -cy);
-      drawChecker(ctx, dims, theme, cx, cy, player, highlight);
-      ctx.restore();
+      withSavedCtx(ctx, () => {
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -cy);
+        drawChecker(ctx, dims, theme, cx, cy, player, highlight);
+      });
     } else {
       drawChecker(ctx, dims, theme, cx, cy, player, highlight);
     }
@@ -129,7 +131,7 @@ function drawBarStack(
   // Stack from center of each bar half
   const startY = halfMidY - ((visibleCount - 1) / 2) * dims.checkerSpacing;
 
-  const stackAnim = animState.stackAnimations.find((a) => a.point === 'bar');
+  const stackAnim = getStackAnimation('bar');
 
   for (let i = 0; i < visibleCount; i++) {
     const cy = startY + i * dims.checkerSpacing;
@@ -139,12 +141,12 @@ function drawBarStack(
 
     if (isTop && stackAnim) {
       const scale = stackAnimScale(stackAnim);
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.scale(scale, scale);
-      ctx.translate(-cx, -cy);
-      drawChecker(ctx, dims, theme, cx, cy, player, highlight);
-      ctx.restore();
+      withSavedCtx(ctx, () => {
+        ctx.translate(cx, cy);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -cy);
+        drawChecker(ctx, dims, theme, cx, cy, player, highlight);
+      });
     } else {
       drawChecker(ctx, dims, theme, cx, cy, player, highlight);
     }
@@ -171,7 +173,7 @@ function drawBearOffCounters(
   theme: BoardTheme,
   boardFlipped = false,
 ): void {
-  const cx = boardFlipped ? dims.boardLeft - dims.padding * 0.5 : dims.boardLeft + dims.boardWidth + dims.padding * 0.5;
+  const cx = getBearOffXRaw(dims, boardFlipped);
   drawBearOffProgressBar(ctx, dims, theme, cx, boardState);
 }
 
@@ -184,77 +186,77 @@ function drawBearOffProgressBar(
   cx: number,
   boardState: BoardState,
 ): void {
-  ctx.save(); // outer save — guarantees no ctx state leaks after this function
+  withSavedCtx(ctx, () => {
+    // outer save — guarantees no ctx state leaks after this function
 
-  const barW = Math.max(6, Math.round(dims.checkerRadius * 0.55));
-  const halfH = dims.boardHeight / 2;
-  const margin = dims.boardHeight * 0.05;
-  const barH = halfH - margin * 2;
-  const cornerR = barW / 2;
+    const barW = Math.max(6, Math.round(dims.checkerRadius * 0.55));
+    const halfH = dims.boardHeight / 2;
+    const margin = dims.boardHeight * 0.05;
+    const barH = halfH - margin * 2;
+    const cornerR = barW / 2;
 
-  for (const [player, isTop] of [
-    ['white', false],
-    ['black', true],
-  ] as const) {
-    const count = player === 'white' ? boardState.borneOff.white : boardState.borneOff.black;
-    const style = player === 'white' ? theme.checkers.white : theme.checkers.black;
+    for (const [player, isTop] of [
+      ['white', false],
+      ['black', true],
+    ] as const) {
+      const count = player === 'white' ? boardState.borneOff.white : boardState.borneOff.black;
+      const style = player === 'white' ? theme.checkers.white : theme.checkers.black;
 
-    const topY = isTop ? dims.boardTop + margin : dims.boardTop + halfH + margin;
-    const left = cx - barW / 2;
-    const fillH = (count / 15) * barH;
+      const topY = isTop ? dims.boardTop + margin : dims.boardTop + halfH + margin;
+      const left = cx - barW / 2;
+      const fillH = (count / 15) * barH;
 
-    // Track (empty background)
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(left, topY, barW, barH, cornerR);
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.fill();
-    ctx.strokeStyle = style.stroke;
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
+      // Track (empty background)
+      withSavedCtx(ctx, () => {
+        ctx.beginPath();
+        ctx.roundRect(left, topY, barW, barH, cornerR);
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.fill();
+        ctx.strokeStyle = style.stroke;
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
 
-    // Filled portion — grows from outer edge inward
-    if (count > 0) {
-      const fillY = isTop ? topY : topY + barH - fillH;
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(left, fillY, barW, fillH, cornerR);
-      const grad = ctx.createLinearGradient(left, fillY, left + barW, fillY);
-      grad.addColorStop(0, style.gradientLight);
-      grad.addColorStop(1, style.gradientDark);
-      ctx.fillStyle = grad;
-      ctx.fill();
-      ctx.restore();
+      // Filled portion — grows from outer edge inward
+      if (count > 0) {
+        const fillY = isTop ? topY : topY + barH - fillH;
+        withSavedCtx(ctx, () => {
+          ctx.beginPath();
+          ctx.roundRect(left, fillY, barW, fillH, cornerR);
+          ctx.fillStyle = makeLinearGradient(ctx, left, fillY, left + barW, fillY, [
+            [0, style.gradientLight],
+            [1, style.gradientDark],
+          ]);
+          ctx.fill();
+        });
+      }
+
+      // Count label — black's label sits ABOVE its bar, white's label sits BELOW its bar.
+      // isTop=true  → black  → bar occupies top half    → label above the bar top edge
+      // isTop=false → white  → bar occupies bottom half → label below the bar bottom edge
+      if (count > 0) {
+        const offset = dims.boardHeight * 0.015;
+        const labelY = isTop
+          ? topY - offset            // above the black bar
+          : topY + barH + offset;    // below the white bar
+        const baseline = isTop ? 'bottom' : 'top';
+        const fs = Math.max(6, Math.round(barW * 0.8));
+        withSavedCtx(ctx, () => {
+          ctx.font = `bold ${fs}px Inter, system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = baseline;
+          // Shadow pass
+          ctx.fillStyle = 'rgba(0,0,0,0.50)';
+          ctx.fillText(String(count), cx + 0.4, labelY + 0.4);
+          // Main pass
+          ctx.globalAlpha = 0.75;
+          ctx.fillStyle = theme.text;
+          ctx.fillText(String(count), cx, labelY);
+        });
+      }
     }
-
-    // Count label — black's label sits ABOVE its bar, white's label sits BELOW its bar.
-    // isTop=true  → black  → bar occupies top half    → label above the bar top edge
-    // isTop=false → white  → bar occupies bottom half → label below the bar bottom edge
-    if (count > 0) {
-      const offset = dims.boardHeight * 0.015;
-      const labelY = isTop
-        ? topY - offset            // above the black bar
-        : topY + barH + offset;    // below the white bar
-      const baseline = isTop ? 'bottom' : 'top';
-      const fs = Math.max(6, Math.round(barW * 0.8));
-      ctx.save();
-      ctx.font = `bold ${fs}px Inter, system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = baseline;
-      // Shadow pass
-      ctx.fillStyle = 'rgba(0,0,0,0.50)';
-      ctx.fillText(String(count), cx + 0.4, labelY + 0.4);
-      // Main pass
-      ctx.globalAlpha = 0.75;
-      ctx.fillStyle = theme.text;
-      ctx.fillText(String(count), cx, labelY);
-      ctx.restore();
-    }
-  }
-
-  ctx.restore(); // paired with outer save
+  });
 }
 
 // ─── Single checker drawing ───────────────────────────────────────────────────
