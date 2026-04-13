@@ -108,6 +108,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Enforce the bundle-size budget so regressions surface in CI.
+      - name: Bundle-size budget
+        run: pnpm check:bundle
+
+      # Audit event listeners / observers for missing cleanup.
+      - name: Listener audit
+        run: pnpm audit:listeners
+
       # Upload dist so the deploy job can reuse it without rebuilding.
       - name: Upload dist artifact
         uses: actions/upload-artifact@v7
