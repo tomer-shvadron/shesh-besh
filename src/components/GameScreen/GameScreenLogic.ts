@@ -5,6 +5,7 @@ import { useAutoPauseOnHidden } from '@/hooks/useAutoPauseOnHidden';
 import { useAutoRoll } from '@/hooks/useAutoRoll';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useScoreSaver } from '@/hooks/useScoreSaver';
 import { useSettingsPersistence } from '@/hooks/useSettingsPersistence';
 import { useTimer } from '@/hooks/useTimer';
 import { useWakeLock } from '@/hooks/useWakeLock';
@@ -57,6 +58,7 @@ export function useGameScreenLogic(): GameScreenLogicReturn {
   useAutoRoll();
   useSettingsPersistence();
   useAutoPauseOnHidden();
+  useScoreSaver();
 
   // On mount, try to load a saved game. If none exists, open the new game dialog.
   useEffect(() => {

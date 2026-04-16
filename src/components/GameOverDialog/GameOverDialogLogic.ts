@@ -1,5 +1,6 @@
 import { useGameStore } from '@/state/game.store';
 import { checkersRemaining } from '@/utils/bearOff';
+import { calcScore } from '@/utils/score';
 
 export interface GameOverDialogLogicReturn {
   winnerLabel: string;
@@ -13,26 +14,6 @@ function formatMs(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
-function calcScore(timerElapsed: number, difficulty: string, margin: number): number {
-  let diffMultiplier: number;
-  if (difficulty === 'hard') {
-    diffMultiplier = 3;
-  } else if (difficulty === 'medium') {
-    diffMultiplier = 2;
-  } else {
-    diffMultiplier = 1;
-  }
-
-  // Speed bonus: faster = more points (cap at 5 minutes = 300 s for max bonus)
-  const totalSeconds = Math.max(1, Math.floor(timerElapsed / 1000));
-  const speedBonus = Math.max(0, Math.round(300 / totalSeconds));
-
-  // Margin bonus: each extra checker remaining = 10 pts
-  const marginBonus = margin * 10;
-
-  return 100 * diffMultiplier * speedBonus + marginBonus;
 }
 
 export function useGameOverDialogLogic(): GameOverDialogLogicReturn {
